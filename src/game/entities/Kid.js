@@ -2,9 +2,12 @@ import { Entity } from './Entity.js';
 
 export class Kid extends Entity {
   constructor(game, x, y, aggressionLevel = 1) {
-    super(x, y, 24, 32); // Smaller than player
+    super(x, y, 32, 40); // Slightly larger for better visibility
     this.game = game;
     this.aggressionLevel = aggressionLevel; // 1 = easy, 2 = normal, 3 = aggressive
+    
+    // Randomly select sprite type (1, 2, or 3)
+    this.spriteType = Math.floor(Math.random() * 3) + 1;
     
     // Movement properties - scale with aggression
     this.speed = aggressionLevel === 1 ? 70 : aggressionLevel === 2 ? 80 : 90;
@@ -34,7 +37,11 @@ export class Kid extends Entity {
     // Animation
     this.animationFrame = 0;
     this.animationTimer = 0;
-    this.facing = 'down';
+    this.facing = 'left'; // Kids face left by default
+    this.isMoving = false;
+    
+    // Sound effects
+    this.hasPlayedLaughSound = false; // Prevent multiple laugh sounds per flee
   }
   
   update(deltaTime) {
@@ -57,21 +64,21 @@ export class Kid extends Entity {
     }
     
     // Update animation
-    if (this.vx !== 0 || this.vy !== 0) {
+    this.isMoving = this.vx !== 0 || this.vy !== 0;
+    if (this.isMoving) {
       this.animationTimer += deltaTime;
-      if (this.animationTimer >= 0.15) {
-        this.animationFrame = (this.animationFrame + 1) % 4;
+      if (this.animationTimer >= 0.2) {
+        this.animationFrame = (this.animationFrame + 1) % 2; // Alternate between 2 frames
         this.animationTimer = 0;
       }
     } else {
       this.animationFrame = 0;
+      this.animationTimer = 0;
     }
     
-    // Update facing direction
-    if (Math.abs(this.vx) > Math.abs(this.vy)) {
+    // Update facing direction (only left/right for kids)
+    if (Math.abs(this.vx) > 0.1) {
       this.facing = this.vx > 0 ? 'right' : 'left';
-    } else if (this.vy !== 0) {
-      this.facing = this.vy > 0 ? 'down' : 'up';
     }
     
     // Update book drop timer if carrying
@@ -105,13 +112,20 @@ export class Kid extends Entity {
       const distToPlayer = this.getDistanceTo(player);
       if (distToPlayer < this.playerDetectionRange) {
         this.state = 'fleeing';
+        this.playLaughingSound();
         return;
       }
     }
     
-    // Look for shelves with books to steal
+    // Look for shelves with books to steal (only check nearby shelves)
     if (!this.carriedBook && this.bookStealCooldown <= 0) {
       for (const shelf of shelves) {
+        // Quick bounds check before expensive distance calculation
+        if (Math.abs(shelf.x - this.x) > this.shelfDetectionRange || 
+            Math.abs(shelf.y - this.y) > this.shelfDetectionRange) {
+          continue;
+        }
+        
         const distToShelf = this.getDistanceTo(shelf);
         if (distToShelf < this.shelfDetectionRange && shelf.books.some(b => b !== null)) {
           this.target = shelf;
@@ -211,6 +225,7 @@ export class Kid extends Entity {
       if (this.fleeTimer <= 0) {
         this.fleeTimer = null;
         this.state = 'wandering';
+        this.hasPlayedLaughSound = false; // Reset for next flee
       }
       return;
     }
@@ -220,6 +235,7 @@ export class Kid extends Entity {
     // Stop fleeing if far enough away
     if (distToPlayer > this.playerDetectionRange * 1.5) {
       this.state = 'wandering';
+      this.hasPlayedLaughSound = false; // Reset for next flee
       return;
     }
     
@@ -256,6 +272,7 @@ export class Kid extends Entity {
       const distToPlayer = this.getDistanceTo(player);
       if (distToPlayer < this.playerDetectionRange) {
         this.state = 'fleeing';
+        this.playLaughingSound();
         return;
       }
     }
@@ -319,16 +336,36 @@ export class Kid extends Entity {
   }
   
   render(ctx, interpolation) {
-    const sprite = this.game.assetLoader.getImage('kid');
+    // Get appropriate sprite based on sprite type and animation state
+    let sprite;
+    const spritePrefix = `kid${this.spriteType}`;
+    
+    if (this.isMoving) {
+      // Use walking sprite when moving
+      sprite = this.animationFrame === 0 
+        ? this.game.assetLoader.getImage(`${spritePrefix}Stand`)
+        : this.game.assetLoader.getImage(`${spritePrefix}Walk`);
+    } else {
+      // Use standing sprite when stationary
+      sprite = this.game.assetLoader.getImage(`${spritePrefix}Stand`);
+    }
+    
+    // Fallback to placeholder
+    if (!sprite) {
+      sprite = this.game.assetLoader.getImage('kid');
+    }
     
     if (sprite) {
-      // Draw sprite
+      // Draw sprite with direction flipping
       this.game.renderer.drawSprite(
         sprite,
         this.x,
         this.y,
         this.width,
-        this.height
+        this.height,
+        {
+          flipX: this.facing === 'right' // Flip when facing right
+        }
       );
     } else {
       // Fallback rendering with aggression-based colors
@@ -453,18 +490,30 @@ export class Kid extends Entity {
     const newX = this.x + this.vx * deltaTime;
     const newY = this.y + this.vy * deltaTime;
     
-    // Check collisions with shelves
+    // Check collisions with shelves (only nearby ones)
     let canMoveX = true;
     let canMoveY = true;
+    const checkRadius = 100; // Only check shelves within this radius
     
     for (const shelf of state.shelves) {
+      // Quick bounds check
+      if (Math.abs(shelf.x - this.x) > checkRadius || 
+          Math.abs(shelf.y - this.y) > checkRadius) {
+        continue;
+      }
+      
       // Check X movement
-      if (this.checkCollision(newX, this.y, shelf)) {
+      if (canMoveX && this.checkCollision(newX, this.y, shelf)) {
         canMoveX = false;
       }
       // Check Y movement
-      if (this.checkCollision(this.x, newY, shelf)) {
+      if (canMoveY && this.checkCollision(this.x, newY, shelf)) {
         canMoveY = false;
+      }
+      
+      // Early exit if both movements are blocked
+      if (!canMoveX && !canMoveY) {
+        break;
       }
     }
     
@@ -572,5 +621,15 @@ export class Kid extends Entity {
     // Reset state to wandering
     this.state = 'wandering';
     this.target = null;
+  }
+  
+  playLaughingSound() {
+    // Only play if we haven't already played it for this flee session
+    if (!this.hasPlayedLaughSound) {
+      const laughSound = new Audio('/kid_laughing.mp3');
+      laughSound.volume = 0.5;
+      laughSound.play().catch(e => console.log('Kid laugh sound play failed:', e));
+      this.hasPlayedLaughSound = true;
+    }
   }
 }

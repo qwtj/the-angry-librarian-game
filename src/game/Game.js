@@ -35,7 +35,7 @@ export class Game {
     
     // Debug info
     this.debug = {
-      showFPS: false, // Disabled by default
+      showFPS: false, // Disabled FPS counter
       showCollisionBoxes: false,
       showGrid: false
     };
@@ -100,13 +100,24 @@ export class Game {
     // Generate placeholder assets for development
     this.assetLoader.generatePlaceholderAssets();
     
-    // Later we'll load real assets like this:
-    // const assets = {
-    //   images: { ... },
-    //   audio: { ... },
-    //   data: { ... }
-    // };
-    // await this.assetLoader.loadAll(assets);
+    // Load real assets with cache busting
+    const cacheBuster = `?v=${Date.now()}`;
+    const assets = {
+      images: {
+        woodFloor: `/src/assets/sprites/wood_floor_tiles.jpg${cacheBuster}`,
+        librarianStand: `/src/assets/sprites/librarian_stand.png${cacheBuster}`,
+        librarianWalk1: `/src/assets/sprites/librarian_walk1.png${cacheBuster}`,
+        librarianWalk2: `/src/assets/sprites/librarian_walk2.png${cacheBuster}`,
+        // Kid sprites
+        kid1Stand: `/src/assets/sprites/kid1_stand.png${cacheBuster}`,
+        kid1Walk: `/src/assets/sprites/kid1_walk.png${cacheBuster}`,
+        kid2Stand: `/src/assets/sprites/kid2_stand.png${cacheBuster}`,
+        kid2Walk: `/src/assets/sprites/kid2_walk.png${cacheBuster}`,
+        kid3Stand: `/src/assets/sprites/kid3_stand.png${cacheBuster}`,
+        kid3Walk: `/src/assets/sprites/kid3_walk.png${cacheBuster}`
+      }
+    };
+    await this.assetLoader.loadAll(assets);
   }
   
   update(deltaTime) {
@@ -127,10 +138,10 @@ export class Game {
     // Render current state
     this.stateManager.render(this.renderer, interpolation);
     
-    // Render debug info (disabled)
-    // if (this.debug.showFPS) {
-    //   this.renderDebugInfo();
-    // }
+    // Render debug info
+    if (this.debug.showFPS) {
+      this.renderDebugInfo();
+    }
   }
   
   renderDebugInfo() {

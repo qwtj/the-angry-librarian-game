@@ -2,7 +2,7 @@ import { Entity } from './Entity.js';
 
 export class Player extends Entity {
   constructor(game, x, y) {
-    super(x, y, 32, 48);
+    super(x, y, 48, 64); // Increased size from 32x48 to 48x64
     this.game = game;
     
     // Stats (from design doc)
@@ -32,17 +32,22 @@ export class Player extends Entity {
     this.facing = 'down'; // up, down, left, right
     this.animationTimer = 0;
     this.animationFrame = 0;
+    this.isMoving = false;
     
     // Collision box (covers most of the player)
     this.collisionBox = {
-      offsetX: 4,
-      offsetY: 16, // Reduced from 32 to cover more of the player
-      width: 24,
-      height: 28  // Increased from 16 to cover more vertical space
+      offsetX: 8,
+      offsetY: 24, // Adjusted for larger sprite
+      width: 32,
+      height: 36  // Adjusted for larger sprite
     };
     
     // Repel radius for kids
     this.repelRadius = 1.5 * 32; // 1.5 meters in pixels
+    
+    // Sound effects
+    this.outOfBreathSound = null;
+    this.isPlayingOutOfBreath = false;
   }
   
   update(deltaTime) {
@@ -62,6 +67,21 @@ export class Player extends Entity {
       // Regenerate stamina when not sprinting
       this.stats.stamina += 10 * deltaTime; // 10 stamina per second
       this.stats.stamina = Math.min(this.stats.maxStamina, this.stats.stamina);
+    }
+    
+    // Handle out of breath sound
+    if (input.isActionDown('sprint') && this.stats.stamina <= 0.1) {
+      // Player is holding shift but has no stamina (using 0.1 threshold for floating point)
+      if (!this.isPlayingOutOfBreath) {
+        this.playOutOfBreathSound();
+        this.isPlayingOutOfBreath = true;
+      }
+    } else {
+      // Stop the sound if they release shift or regain stamina
+      if (this.isPlayingOutOfBreath) {
+        this.stopOutOfBreathSound();
+        this.isPlayingOutOfBreath = false;
+      }
     }
     
     // Calculate speed - only apply sprint multiplier if we have stamina
@@ -119,14 +139,16 @@ export class Player extends Entity {
     }
     
     // Update animation
-    if (this.vx !== 0 || this.vy !== 0) {
+    this.isMoving = this.vx !== 0 || this.vy !== 0;
+    if (this.isMoving) {
       this.animationTimer += deltaTime;
       if (this.animationTimer >= 0.2) {
-        this.animationFrame = (this.animationFrame + 1) % 4;
+        this.animationFrame = (this.animationFrame + 1) % 2; // Alternate between 2 frames
         this.animationTimer = 0;
       }
     } else {
       this.animationFrame = 0;
+      this.animationTimer = 0;
     }
     
     // Update camera to follow player
@@ -134,8 +156,20 @@ export class Player extends Entity {
   }
   
   render(ctx, interpolation) {
-    // Get sprite
-    const sprite = this.game.assetLoader.getImage('librarian');
+    // Get appropriate sprite based on animation frame
+    let sprite;
+    if (this.isMoving) {
+      sprite = this.animationFrame === 0 
+        ? this.game.assetLoader.getImage('librarianWalk1')
+        : this.game.assetLoader.getImage('librarianWalk2');
+    } else {
+      sprite = this.game.assetLoader.getImage('librarianStand'); // Use standing sprite when not moving
+    }
+    
+    // Fallback to placeholder if sprites not loaded
+    if (!sprite) {
+      sprite = this.game.assetLoader.getImage('librarian');
+    }
     
     // Draw speed trail effect if moving fast with upgrades
     const speedLevel = this.upgradeLevels?.speed || 0;
@@ -155,7 +189,10 @@ export class Player extends Entity {
             trailX,
             trailY,
             this.width,
-            this.height
+            this.height,
+            {
+              flipX: this.facing === 'right' // Flip horizontally when facing right
+            }
           );
         }
       }
@@ -164,13 +201,16 @@ export class Player extends Entity {
     
     if (!sprite) return;
     
-    // Draw sprite
+    // Draw sprite with direction flipping
     this.game.renderer.drawSprite(
       sprite,
       this.x,
       this.y,
       this.width,
-      this.height
+      this.height,
+      {
+        flipX: this.facing === 'right' // Flip horizontally when facing right
+      }
     );
     
     // Draw pickup radius (debug)
@@ -343,5 +383,22 @@ export class Player extends Entity {
       orange: '#ff8844'
     };
     return colors[color] || '#888888';
+  }
+  
+  playOutOfBreathSound() {
+    if (!this.outOfBreathSound) {
+      this.outOfBreathSound = new Audio('/out_of_breath.mp3');
+      this.outOfBreathSound.volume = 0.6;
+      this.outOfBreathSound.loop = true;
+    }
+    console.log('Playing out of breath sound');
+    this.outOfBreathSound.play().catch(e => console.log('Out of breath sound play failed:', e));
+  }
+  
+  stopOutOfBreathSound() {
+    if (this.outOfBreathSound) {
+      this.outOfBreathSound.pause();
+      this.outOfBreathSound.currentTime = 0;
+    }
   }
 }

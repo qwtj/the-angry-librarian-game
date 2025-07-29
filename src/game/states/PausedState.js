@@ -9,11 +9,18 @@ export class PausedState extends State {
       { text: 'Main Menu', action: () => this.mainMenu() }
     ];
     this.selectedIndex = 0;
+    this.selectSound = null;
   }
   
   enter() {
     this.selectedIndex = 0;
     this.game.gameData.isPaused = true;
+    
+    // Initialize select sound if not already created
+    if (!this.selectSound) {
+      this.selectSound = new Audio('/menu_select.mp3');
+      this.selectSound.volume = 0.7;
+    }
   }
   
   exit() {
@@ -32,10 +39,12 @@ export class PausedState extends State {
     // Menu navigation
     if (input.isKeyPressed('ArrowUp') || input.isKeyPressed('w')) {
       this.selectedIndex = (this.selectedIndex - 1 + this.menuItems.length) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('ArrowDown') || input.isKeyPressed('s')) {
       this.selectedIndex = (this.selectedIndex + 1) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('Enter') || input.isKeyPressed(' ')) {
@@ -92,7 +101,13 @@ export class PausedState extends State {
   }
   
   resume() {
-    this.game.stateManager.returnToPreviousState();
+    // Resume game music
+    const playingState = this.game.stateManager.getState('playing');
+    if (playingState && playingState.bgMusic) {
+      playingState.bgMusic.play().catch(e => console.log('Game music resume failed:', e));
+    }
+    
+    this.game.stateManager.popState();
   }
   
   restart() {
@@ -101,5 +116,12 @@ export class PausedState extends State {
   
   mainMenu() {
     this.game.stateManager.changeState('menu');
+  }
+  
+  playSelectSound() {
+    if (this.selectSound) {
+      this.selectSound.currentTime = 0;
+      this.selectSound.play().catch(e => console.log('Select sound play failed:', e));
+    }
   }
 }

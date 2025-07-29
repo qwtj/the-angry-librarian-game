@@ -25,7 +25,20 @@ export class PlayingState extends State {
     // Kid spawning
     this.kidSpawnTimer = 0;
     this.kidSpawnInterval = 15; // Constant 15 seconds between spawns
-    this.maxKids = 100; // No artificial limit on kids
+    this.maxKids = 20; // Limit kids to prevent performance issues
+    
+    // Performance optimizations
+    this.floorPattern = null; // Cache floor pattern
+    this.patternCanvas = null; // Canvas for pattern
+    
+    // Background music
+    this.bgMusic = null;
+    this.musicLoaded = false;
+    
+    // Sound effects
+    this.pickupSounds = []; // Array of audio elements for overlapping sounds
+    this.shelfSound = null;
+    
     this.spawnPoints = [
       { x: 50, y: 520 }, // Left entrance
       { x: 1550, y: 520 }, // Right entrance  
@@ -52,6 +65,38 @@ export class PlayingState extends State {
     
     // Initialize game world
     this.initializeLevel();
+    
+    // Start background music
+    if (!this.bgMusic) {
+      this.bgMusic = new Audio('/game_music.mp3');
+      this.bgMusic.loop = true;
+      this.bgMusic.volume = 0.4; // Slightly lower volume for gameplay
+      
+      this.bgMusic.addEventListener('loadeddata', () => {
+        this.musicLoaded = true;
+        this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+      });
+      
+      this.bgMusic.load();
+    } else {
+      // Resume if returning to game
+      this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+    }
+    
+    // Initialize sound effects
+    if (this.pickupSounds.length === 0) {
+      // Create 5 audio instances for overlapping pickup sounds
+      for (let i = 0; i < 5; i++) {
+        const audio = new Audio('/pickup_book.mp3');
+        audio.volume = 0.5;
+        this.pickupSounds.push(audio);
+      }
+    }
+    
+    if (!this.shelfSound) {
+      this.shelfSound = new Audio('/book_on_shelf.mp3');
+      this.shelfSound.volume = 0.6;
+    }
   }
   
   exit() {
@@ -59,6 +104,11 @@ export class PlayingState extends State {
     this.kids = [];
     this.books = [];
     this.particles = [];
+    
+    // Pause music when leaving game
+    if (this.bgMusic) {
+      this.bgMusic.pause();
+    }
   }
   
   initializeLevel() {
@@ -98,7 +148,11 @@ export class PlayingState extends State {
     
     // Handle pause
     if (input.isKeyPressed('p') || input.isKeyPressed('Escape')) {
-      this.game.stateManager.changeState('paused');
+      // Pause music when pausing game
+      if (this.bgMusic) {
+        this.bgMusic.pause();
+      }
+      this.game.stateManager.pushState('paused');
       return;
     }
     
@@ -217,21 +271,36 @@ export class PlayingState extends State {
     // Render floor tiles
     this.renderFloor(ctx);
     
-    // Render shelves
+    // Get viewport bounds for culling
+    const viewportX = this.game.camera.getViewportX();
+    const viewportY = this.game.camera.getViewportY();
+    const viewportWidth = this.game.camera.viewportWidth / this.game.camera.zoom;
+    const viewportHeight = this.game.camera.viewportHeight / this.game.camera.zoom;
+    const padding = 100; // Render entities slightly outside viewport
+    
+    // Render shelves (only visible ones)
     for (const shelf of this.shelves) {
-      renderer.addToLayer('entities', shelf);
+      if (this.isInViewport(shelf, viewportX - padding, viewportY - padding, 
+                           viewportWidth + padding * 2, viewportHeight + padding * 2)) {
+        renderer.addToLayer('entities', shelf);
+      }
     }
     
-    // Render books (only those not held or shelved)
+    // Render books (only visible ones that are not held or shelved)
     for (const book of this.books) {
-      if (!book.isHeld && !book.isShelved) {
+      if (!book.isHeld && !book.isShelved && 
+          this.isInViewport(book, viewportX - padding, viewportY - padding, 
+                           viewportWidth + padding * 2, viewportHeight + padding * 2)) {
         renderer.addToLayer('entities', book);
       }
     }
     
-    // Render kids
+    // Render kids (only visible ones)
     for (const kid of this.kids) {
-      renderer.addToLayer('entities', kid);
+      if (this.isInViewport(kid, viewportX - padding, viewportY - padding, 
+                           viewportWidth + padding * 2, viewportHeight + padding * 2)) {
+        renderer.addToLayer('entities', kid);
+      }
     }
     
     // TODO: Render particles
@@ -399,41 +468,52 @@ export class PlayingState extends State {
   }
   
   renderFloor(ctx) {
-    const tileSize = 32;
-    const viewportX = this.game.camera.getViewportX();
-    const viewportY = this.game.camera.getViewportY();
-    const viewportWidth = this.game.camera.viewportWidth / this.game.camera.zoom;
-    const viewportHeight = this.game.camera.viewportHeight / this.game.camera.zoom;
+    const woodFloorImage = this.game.assetLoader.getImage('woodFloor');
     
-    // Calculate visible tile range
-    const startX = Math.floor(viewportX / tileSize) * tileSize;
-    const startY = Math.floor(viewportY / tileSize) * tileSize;
-    const endX = Math.ceil((viewportX + viewportWidth) / tileSize) * tileSize;
-    const endY = Math.ceil((viewportY + viewportHeight) / tileSize) * tileSize;
+    if (!woodFloorImage || !woodFloorImage.complete) {
+      // Fallback to solid color if image hasn't loaded
+      const viewportX = this.game.camera.getViewportX();
+      const viewportY = this.game.camera.getViewportY();
+      const viewportWidth = this.game.camera.viewportWidth / this.game.camera.zoom;
+      const viewportHeight = this.game.camera.viewportHeight / this.game.camera.zoom;
+      
+      this.game.renderer.addToLayer('background', (ctx) => {
+        ctx.fillStyle = '#d4a574';
+        ctx.fillRect(viewportX, viewportY, viewportWidth, viewportHeight);
+      });
+      return;
+    }
     
-    // Add floor rendering to background layer
+    // Create pattern once and cache it
+    if (!this.floorPattern) {
+      // Create a scaled pattern canvas
+      const scale = 0.5;
+      this.patternCanvas = document.createElement('canvas');
+      this.patternCanvas.width = woodFloorImage.width * scale;
+      this.patternCanvas.height = woodFloorImage.height * scale;
+      const patternCtx = this.patternCanvas.getContext('2d');
+      patternCtx.drawImage(woodFloorImage, 0, 0, this.patternCanvas.width, this.patternCanvas.height);
+      this.floorPattern = this.game.renderer.ctx.createPattern(this.patternCanvas, 'repeat');
+    }
+    
+    // Add wood floor image rendering to background layer
     this.game.renderer.addToLayer('background', (ctx) => {
-      // Draw floor tiles
-      for (let x = startX; x < endX; x += tileSize) {
-        for (let y = startY; y < endY; y += tileSize) {
-          // Alternate tile colors for pattern
-          const tileX = Math.floor(x / tileSize);
-          const tileY = Math.floor(y / tileSize);
-          const isAlternate = (tileX + tileY) % 2 === 0;
-          
-          ctx.fillStyle = isAlternate ? '#d4a574' : '#c09050';
-          ctx.fillRect(x, y, tileSize, tileSize);
-          
-          // Tile border
-          ctx.strokeStyle = '#b08040';
-          ctx.lineWidth = 1;
-          ctx.strokeRect(x, y, tileSize, tileSize);
-        }
+      if (this.floorPattern) {
+        ctx.save();
+        ctx.fillStyle = this.floorPattern;
+        // Fill the entire world area, not just viewport
+        ctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
+        ctx.restore();
       }
     });
   }
   
   updateKidSpawning(deltaTime) {
+    // Don't spawn more kids if we're at the limit
+    if (this.kids.length >= this.maxKids) {
+      return;
+    }
+    
     // Update spawn timer
     this.kidSpawnTimer -= deltaTime;
     
@@ -561,6 +641,9 @@ export class PlayingState extends State {
           
           // Award XP
           this.awardXP(5);
+          
+          // Play pickup sound
+          this.playPickupSound();
         }
       }
     }
@@ -583,6 +666,9 @@ export class PlayingState extends State {
           
           // Award XP
           this.awardXP(10);
+          
+          // Play shelf sound
+          this.playShelfSound();
         }
       }
     }
@@ -744,8 +830,40 @@ export class PlayingState extends State {
           
           // Award XP for snatching
           this.awardXP(7); // Slightly more XP than ground pickup
+          
+          // Play pickup sound
+          this.playPickupSound();
         }
       }
+    }
+  }
+  
+  isInViewport(entity, viewX, viewY, viewWidth, viewHeight) {
+    return !(entity.x + entity.width < viewX || 
+             entity.x > viewX + viewWidth ||
+             entity.y + entity.height < viewY || 
+             entity.y > viewY + viewHeight);
+  }
+  
+  playPickupSound() {
+    // Find an available audio instance that's not currently playing
+    for (const audio of this.pickupSounds) {
+      if (audio.paused || audio.ended) {
+        audio.currentTime = 0;
+        audio.play().catch(e => console.log('Pickup sound play failed:', e));
+        return;
+      }
+    }
+    
+    // If all are playing, use the first one anyway (will restart it)
+    this.pickupSounds[0].currentTime = 0;
+    this.pickupSounds[0].play().catch(e => console.log('Pickup sound play failed:', e));
+  }
+  
+  playShelfSound() {
+    if (this.shelfSound) {
+      this.shelfSound.currentTime = 0;
+      this.shelfSound.play().catch(e => console.log('Shelf sound play failed:', e));
     }
   }
 }

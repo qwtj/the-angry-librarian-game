@@ -8,9 +8,12 @@ export class UpgradeSelectionState extends State {
     this.upgrades = [];
     this.selectedIndex = 0;
     this.animationTimer = 0;
+    this.selectSound = null;
   }
   
   enter() {
+    console.log('Entering upgrade selection state');
+    
     // Get player's current upgrades
     const player = this.game.stateManager.getState('playing')?.player;
     const playerUpgrades = player?.upgradeLevels || {};
@@ -28,6 +31,20 @@ export class UpgradeSelectionState extends State {
     this.game.gameData.isPaused = true;
     this.selectedIndex = 0;
     this.animationTimer = 0;
+    
+    // Clear any lingering input state
+    this.game.inputManager.update();
+    
+    // Initialize select sound if not already created
+    if (!this.selectSound) {
+      this.selectSound = new Audio('/menu_select.mp3');
+      this.selectSound.volume = 0.7;
+    }
+    
+    // Play level up yay sound
+    const yaySound = new Audio('/yay.mp3');
+    yaySound.volume = 0.8;
+    yaySound.play().catch(e => console.log('Yay sound play failed:', e));
   }
   
   exit() {
@@ -41,50 +58,22 @@ export class UpgradeSelectionState extends State {
     // Update animation
     this.animationTimer += deltaTime;
     
-    // Track key state to prevent rapid repeating
-    if (!this.keyStates) {
-      this.keyStates = {
-        left: false,
-        right: false,
-        select: false
-      };
-    }
-    
-    // Navigate with arrow keys (check both pressed and down for reliability)
-    const leftPressed = input.isKeyPressed('ArrowLeft') || input.isKeyPressed('a');
-    const rightPressed = input.isKeyPressed('ArrowRight') || input.isKeyPressed('d');
-    const selectPressed = input.isKeyPressed('Enter') || input.isKeyPressed(' ');
-    
-    // Also check if keys are currently down for better responsiveness
-    const leftDown = input.isKeyDown('ArrowLeft') || input.isKeyDown('a');
-    const rightDown = input.isKeyDown('ArrowRight') || input.isKeyDown('d');
-    const selectDown = input.isKeyDown('Enter') || input.isKeyDown(' ');
-    
-    // Left navigation
-    if ((leftPressed || (leftDown && !this.keyStates.left))) {
+    // Simple input handling - use isKeyPressed for single press detection
+    if (input.isKeyPressed('ArrowLeft') || input.isKeyPressed('a')) {
+      console.log('Left arrow pressed, changing selection');
       this.selectedIndex = Math.max(0, this.selectedIndex - 1);
-      this.keyStates.left = true;
-    }
-    if (!leftDown) {
-      this.keyStates.left = false;
+      this.playSelectSound();
     }
     
-    // Right navigation
-    if ((rightPressed || (rightDown && !this.keyStates.right))) {
+    if (input.isKeyPressed('ArrowRight') || input.isKeyPressed('d')) {
+      console.log('Right arrow pressed, changing selection');
       this.selectedIndex = Math.min(this.upgrades.length - 1, this.selectedIndex + 1);
-      this.keyStates.right = true;
-    }
-    if (!rightDown) {
-      this.keyStates.right = false;
+      this.playSelectSound();
     }
     
-    // Select with Enter or Space
-    if ((selectPressed || (selectDown && !this.keyStates.select))) {
+    if (input.isKeyPressed('Enter') || input.isKeyPressed(' ')) {
+      console.log('Enter/Space pressed, selecting upgrade');
       this.selectUpgrade();
-      this.keyStates.select = true;
-    }
-    if (!selectDown) {
-      this.keyStates.select = false;
     }
     
     // Number key shortcuts (1, 2, 3)
@@ -108,7 +97,10 @@ export class UpgradeSelectionState extends State {
         const cardX = startX + i * (cardWidth + cardSpacing);
         if (mousePos.x >= cardX && mousePos.x < cardX + cardWidth &&
             mousePos.y >= 200 && mousePos.y < 450) {
-          this.selectedIndex = i;
+          if (this.selectedIndex !== i) {
+            this.selectedIndex = i;
+            this.playSelectSound();
+          }
           
           if (input.isMousePressed()) {
             this.selectUpgrade();
@@ -267,5 +259,12 @@ export class UpgradeSelectionState extends State {
     }
     
     return lines;
+  }
+  
+  playSelectSound() {
+    if (this.selectSound) {
+      this.selectSound.currentTime = 0;
+      this.selectSound.play().catch(e => console.log('Select sound play failed:', e));
+    }
   }
 }

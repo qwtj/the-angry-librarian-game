@@ -5,16 +5,84 @@ export class MenuState extends State {
     super(game);
     this.menuItems = [
       { text: 'Start Game', action: () => this.startGame() },
-      { text: 'Instructions', action: () => this.showInstructions() },
-      { text: 'Settings', action: () => this.showSettings() }
+      { text: 'Instructions', action: () => this.showInstructions() }
     ];
     this.selectedIndex = 0;
     this.showingInstructions = false;
+    
+    // Video background
+    this.video = null;
+    this.videoLoaded = false;
+    
+    // Background music
+    this.bgMusic = null;
+    this.musicLoaded = false;
+    
+    // Menu selection sound
+    this.selectSound = null;
   }
   
   enter() {
     this.selectedIndex = 0;
     this.showingInstructions = false;
+    
+    // Create and setup video if not already created
+    if (!this.video) {
+      this.video = document.createElement('video');
+      this.video.src = '/menu_background.mp4';
+      this.video.loop = true;
+      this.video.muted = true;
+      this.video.autoplay = true;
+      
+      // Start playing when loaded
+      this.video.addEventListener('loadeddata', () => {
+        this.videoLoaded = true;
+        this.video.play().catch(e => console.log('Video play failed:', e));
+      });
+      
+      // Load the video
+      this.video.load();
+    } else {
+      // Resume playing if returning to menu
+      this.video.play().catch(e => console.log('Video play failed:', e));
+    }
+    
+    // Create and setup background music if not already created
+    if (!this.bgMusic) {
+      this.bgMusic = new Audio('/intro_music.mp3');
+      this.bgMusic.loop = true;
+      this.bgMusic.volume = 0.5; // Set to 50% volume
+      
+      // Start playing when loaded
+      this.bgMusic.addEventListener('loadeddata', () => {
+        this.musicLoaded = true;
+        this.bgMusic.play().catch(e => console.log('Music play failed:', e));
+      });
+      
+      // Load the music
+      this.bgMusic.load();
+    } else {
+      // Resume playing if returning to menu
+      this.bgMusic.play().catch(e => console.log('Music play failed:', e));
+    }
+    
+    // Create menu selection sound if not already created
+    if (!this.selectSound) {
+      this.selectSound = new Audio('/menu_select.mp3');
+      this.selectSound.volume = 0.7; // Slightly louder than music
+    }
+  }
+  
+  exit() {
+    // Pause video when leaving menu
+    if (this.video) {
+      this.video.pause();
+    }
+    
+    // Pause music when leaving menu
+    if (this.bgMusic) {
+      this.bgMusic.pause();
+    }
   }
   
   update(deltaTime) {
@@ -36,11 +104,13 @@ export class MenuState extends State {
     if (input.isKeyPressed('ArrowUp') || input.isKeyPressed('w')) {
       console.log('Moving selection up');
       this.selectedIndex = (this.selectedIndex - 1 + this.menuItems.length) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('ArrowDown') || input.isKeyPressed('s')) {
       console.log('Moving selection down');
       this.selectedIndex = (this.selectedIndex + 1) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('Enter') || input.isKeyPressed(' ')) {
@@ -53,48 +123,75 @@ export class MenuState extends State {
     const ctx = renderer.ctx;
     const { width, height } = this.game;
     
-    // Background
-    ctx.fillStyle = '#f5e6d3';
-    ctx.fillRect(0, 0, width, height);
+    // Draw video background if loaded
+    if (this.video && this.videoLoaded && !this.video.paused) {
+      try {
+        // Scale video to cover the entire canvas
+        const videoAspect = this.video.videoWidth / this.video.videoHeight;
+        const canvasAspect = width / height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        if (videoAspect > canvasAspect) {
+          // Video is wider - fit height, crop width
+          drawHeight = height;
+          drawWidth = height * videoAspect;
+          drawX = (width - drawWidth) / 2;
+          drawY = 0;
+        } else {
+          // Video is taller - fit width, crop height
+          drawWidth = width;
+          drawHeight = width / videoAspect;
+          drawX = 0;
+          drawY = (height - drawHeight) / 2;
+        }
+        
+        ctx.drawImage(this.video, drawX, drawY, drawWidth, drawHeight);
+      } catch (e) {
+        // Fallback to solid color if video fails
+        ctx.fillStyle = '#f5e6d3';
+        ctx.fillRect(0, 0, width, height);
+      }
+    } else {
+      // Fallback background color
+      ctx.fillStyle = '#f5e6d3';
+      ctx.fillRect(0, 0, width, height);
+    }
+    
     
     if (this.showingInstructions) {
       this.renderInstructions(ctx);
       return;
     }
     
-    // Title
     ctx.save();
-    ctx.fillStyle = '#3d2914';
-    ctx.font = 'bold 72px Arial';
+    
+    // Menu items - positioned in bottom third
+    ctx.font = '36px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('LIBRARY SURVIVORS', width / 2, height * 0.25);
     
-    // Subtitle
-    ctx.font = '24px Arial';
-    ctx.fillText('A librarian-sim meets bullet heaven', width / 2, height * 0.35);
+    const menuStartY = height * 0.7; // Start at 70% down the screen
     
-    // Menu items
-    ctx.font = '36px Arial';
     this.menuItems.forEach((item, index) => {
-      const y = height * 0.5 + index * 60;
+      const y = menuStartY + index * 60;
       
       if (index === this.selectedIndex) {
-        // Highlight selected item
-        ctx.fillStyle = '#8B4513';
+        // Highlight selected item with semi-transparent background
+        ctx.fillStyle = 'rgba(139, 69, 19, 0.8)';
         ctx.fillRect(width / 2 - 200, y - 25, 400, 50);
-        ctx.fillStyle = '#f5e6d3';
+        
+        // Selected text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(item.text, width / 2, y);
       } else {
-        ctx.fillStyle = '#3d2914';
+        // Non-selected items with shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillText(item.text, width / 2 + 2, y + 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(item.text, width / 2, y);
       }
-      
-      ctx.fillText(item.text, width / 2, y);
     });
-    
-    // Instructions hint
-    ctx.font = '18px Arial';
-    ctx.fillStyle = '#666';
-    ctx.fillText('Use Arrow Keys or W/S to navigate, Enter to select', width / 2, height * 0.9);
     
     ctx.restore();
   }
@@ -103,13 +200,53 @@ export class MenuState extends State {
     const { width, height } = this.game;
     
     ctx.save();
+    
+    // Draw light brown background box with rounded corners
+    const boxWidth = 700;
+    const boxHeight = 580; // Increased height to fit all text
+    const boxX = (width - boxWidth) / 2;
+    const boxY = height * 0.08;
+    const borderRadius = 20;
+    
+    // Helper function to draw rounded rectangle
+    const drawRoundedRect = (x, y, width, height, radius) => {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
+    
+    // Box shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    drawRoundedRect(boxX + 5, boxY + 5, boxWidth, boxHeight, borderRadius);
+    ctx.fill();
+    
+    // Main box with transparency
+    ctx.fillStyle = 'rgba(245, 230, 211, 0.95)'; // Light brown with 95% opacity
+    drawRoundedRect(boxX, boxY, boxWidth, boxHeight, borderRadius);
+    ctx.fill();
+    
+    // Box border
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 3;
+    drawRoundedRect(boxX, boxY, boxWidth, boxHeight, borderRadius);
+    ctx.stroke();
+    
+    // Title
     ctx.fillStyle = '#3d2914';
-    ctx.font = 'bold 48px Arial';
+    ctx.font = 'bold 42px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('HOW TO PLAY', width / 2, height * 0.15);
+    ctx.fillText('HOW TO PLAY', width / 2, boxY + 50);
     
-    ctx.font = '24px Arial';
+    ctx.font = '20px Arial'; // Reduced from 24px
     const instructions = [
       'Survive 30 minutes of library chaos!',
       '',
@@ -128,8 +265,11 @@ export class MenuState extends State {
       'Press Enter or Escape to return'
     ];
     
+    const lineHeight = 28; // Spacing between lines
+    const startY = boxY + 100; // Start text below title
+    
     instructions.forEach((line, index) => {
-      ctx.fillText(line, width / 2, height * 0.3 + index * 30);
+      ctx.fillText(line, width / 2, startY + index * lineHeight);
     });
     
     ctx.restore();
@@ -143,8 +283,11 @@ export class MenuState extends State {
     this.showingInstructions = true;
   }
   
-  showSettings() {
-    // TODO: Implement settings menu
-    console.log('Settings not implemented yet');
+  playSelectSound() {
+    if (this.selectSound) {
+      // Reset the sound to play from beginning
+      this.selectSound.currentTime = 0;
+      this.selectSound.play().catch(e => console.log('Select sound play failed:', e));
+    }
   }
 }
