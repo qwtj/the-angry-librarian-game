@@ -70,8 +70,8 @@ export class Player extends Entity {
     }
     
     // Handle out of breath sound
-    if (input.isActionDown('sprint') && this.stats.stamina <= 0.1) {
-      // Player is holding shift but has no stamina (using 0.1 threshold for floating point)
+    if (input.isActionDown('sprint') && this.stats.stamina < 1) {
+      // Player is holding shift but has very low stamina
       if (!this.isPlayingOutOfBreath) {
         this.playOutOfBreathSound();
         this.isPlayingOutOfBreath = true;
@@ -391,7 +391,6 @@ export class Player extends Entity {
       this.outOfBreathSound.volume = 0.6;
       this.outOfBreathSound.loop = true;
     }
-    console.log('Playing out of breath sound');
     this.outOfBreathSound.play().catch(e => console.log('Out of breath sound play failed:', e));
   }
   
@@ -400,5 +399,11 @@ export class Player extends Entity {
       this.outOfBreathSound.pause();
       this.outOfBreathSound.currentTime = 0;
     }
+  }
+  
+  cleanup() {
+    // Stop all sounds when player is cleaned up
+    this.stopOutOfBreathSound();
+    this.isPlayingOutOfBreath = false;
   }
 }

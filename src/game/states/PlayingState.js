@@ -109,6 +109,11 @@ export class PlayingState extends State {
     if (this.bgMusic) {
       this.bgMusic.pause();
     }
+    
+    // Stop player sounds
+    if (this.player) {
+      this.player.cleanup();
+    }
   }
   
   initializeLevel() {
