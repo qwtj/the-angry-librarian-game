@@ -88,7 +88,7 @@ export class PlayingState extends State {
       // Create 5 audio instances for overlapping pickup sounds
       for (let i = 0; i < 5; i++) {
         const audio = new Audio('/pickup_book.mp3');
-        audio.volume = 0.5;
+        audio.volume = 0.7; // Increased from 0.5 for better audibility
         this.pickupSounds.push(audio);
       }
     }
@@ -114,6 +114,10 @@ export class PlayingState extends State {
     if (this.player) {
       this.player.cleanup();
     }
+    
+    // Clear sound arrays to ensure re-initialization
+    this.pickupSounds = [];
+    this.shelfSound = null;
   }
   
   initializeLevel() {
@@ -861,8 +865,10 @@ export class PlayingState extends State {
     }
     
     // If all are playing, use the first one anyway (will restart it)
-    this.pickupSounds[0].currentTime = 0;
-    this.pickupSounds[0].play().catch(e => console.log('Pickup sound play failed:', e));
+    if (this.pickupSounds.length > 0) {
+      this.pickupSounds[0].currentTime = 0;
+      this.pickupSounds[0].play().catch(e => console.log('Pickup sound play failed:', e));
+    }
   }
   
   playShelfSound() {

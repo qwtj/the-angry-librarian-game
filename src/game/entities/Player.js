@@ -30,6 +30,7 @@ export class Player extends Entity {
     
     // Animation
     this.facing = 'down'; // up, down, left, right
+    this.lastHorizontalFacing = 'left'; // Track last horizontal direction for sprite flipping
     this.animationTimer = 0;
     this.animationFrame = 0;
     this.isMoving = false;
@@ -131,12 +132,19 @@ export class Player extends Entity {
       this.y = Math.max(0, Math.min(state.worldHeight - this.height, this.y));
     }
     
-    // Update facing direction
-    if (Math.abs(this.vx) > Math.abs(this.vy)) {
-      this.facing = this.vx > 0 ? 'right' : 'left';
-    } else if (this.vy !== 0) {
-      this.facing = this.vy > 0 ? 'down' : 'up';
+    // Update facing direction only when moving - prioritize horizontal movement
+    if (this.vx !== 0 || this.vy !== 0) {
+      // Only update facing when actually moving
+      if (this.vx !== 0) {
+        // If moving horizontally at all, face left or right
+        this.facing = this.vx > 0 ? 'right' : 'left';
+        this.lastHorizontalFacing = this.facing; // Remember horizontal direction
+      } else {
+        // Only face up/down if not moving horizontally
+        this.facing = this.vy > 0 ? 'down' : 'up';
+      }
     }
+    // When not moving, maintain the last facing direction
     
     // Update animation
     this.isMoving = this.vx !== 0 || this.vy !== 0;
@@ -191,7 +199,7 @@ export class Player extends Entity {
             this.width,
             this.height,
             {
-              flipX: this.facing === 'right' // Flip horizontally when facing right
+              flipX: this.lastHorizontalFacing === 'right' // Use last horizontal direction for flipping
             }
           );
         }
@@ -209,7 +217,7 @@ export class Player extends Entity {
       this.width,
       this.height,
       {
-        flipX: this.facing === 'right' // Flip horizontally when facing right
+        flipX: this.lastHorizontalFacing === 'right' // Use last horizontal direction for flipping
       }
     );
     

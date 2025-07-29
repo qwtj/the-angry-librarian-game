@@ -43,7 +43,7 @@ export class UpgradeSelectionState extends State {
     
     // Play level up yay sound
     const yaySound = new Audio('/yay.mp3');
-    yaySound.volume = 0.8;
+    yaySound.volume = 0.5; // Reduced from 0.8 to be less jarring
     yaySound.play().catch(e => console.log('Yay sound play failed:', e));
   }
   
