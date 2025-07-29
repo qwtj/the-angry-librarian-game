@@ -104,17 +104,17 @@ export class Game {
     const cacheBuster = `?v=${Date.now()}`;
     const assets = {
       images: {
-        woodFloor: `/src/assets/sprites/wood_floor_tiles.jpg${cacheBuster}`,
-        librarianStand: `/src/assets/sprites/librarian_stand.png${cacheBuster}`,
-        librarianWalk1: `/src/assets/sprites/librarian_walk1.png${cacheBuster}`,
-        librarianWalk2: `/src/assets/sprites/librarian_walk2.png${cacheBuster}`,
+        woodFloor: `/sprites/wood_floor_tiles.jpg${cacheBuster}`,
+        librarianStand: `/sprites/librarian_stand.png${cacheBuster}`,
+        librarianWalk1: `/sprites/librarian_walk1.png${cacheBuster}`,
+        librarianWalk2: `/sprites/librarian_walk2.png${cacheBuster}`,
         // Kid sprites
-        kid1Stand: `/src/assets/sprites/kid1_stand.png${cacheBuster}`,
-        kid1Walk: `/src/assets/sprites/kid1_walk.png${cacheBuster}`,
-        kid2Stand: `/src/assets/sprites/kid2_stand.png${cacheBuster}`,
-        kid2Walk: `/src/assets/sprites/kid2_walk.png${cacheBuster}`,
-        kid3Stand: `/src/assets/sprites/kid3_stand.png${cacheBuster}`,
-        kid3Walk: `/src/assets/sprites/kid3_walk.png${cacheBuster}`
+        kid1Stand: `/sprites/kid1_stand.png${cacheBuster}`,
+        kid1Walk: `/sprites/kid1_walk.png${cacheBuster}`,
+        kid2Stand: `/sprites/kid2_stand.png${cacheBuster}`,
+        kid2Walk: `/sprites/kid2_walk.png${cacheBuster}`,
+        kid3Stand: `/sprites/kid3_stand.png${cacheBuster}`,
+        kid3Walk: `/sprites/kid3_walk.png${cacheBuster}`
       }
     };
     await this.assetLoader.loadAll(assets);
