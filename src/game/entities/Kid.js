@@ -1,0 +1,576 @@
+import { Entity } from './Entity.js';
+
+export class Kid extends Entity {
+  constructor(game, x, y, aggressionLevel = 1) {
+    super(x, y, 24, 32); // Smaller than player
+    this.game = game;
+    this.aggressionLevel = aggressionLevel; // 1 = easy, 2 = normal, 3 = aggressive
+    
+    // Movement properties - scale with aggression
+    this.speed = aggressionLevel === 1 ? 70 : aggressionLevel === 2 ? 80 : 90;
+    this.fleeSpeed = aggressionLevel === 1 ? 100 : aggressionLevel === 2 ? 110 : 120;
+    this.direction = Math.random() * Math.PI * 2; // Random initial direction
+    this.directionChangeTimer = 0;
+    this.directionChangeInterval = 2; // Change direction every 2 seconds
+    
+    // Behavior states
+    this.state = 'wandering'; // wandering, fleeing, stealing
+    this.target = null; // Target shelf or escape point
+    
+    // Book carrying - scale with aggression
+    this.carriedBook = null;
+    this.bookStealCooldown = 0;
+    this.bookStealCooldownTime = aggressionLevel === 1 ? 4.0 : aggressionLevel === 2 ? 2.5 : 1.5;
+    this.dropBookTimer = 0; // Timer for when to drop carried book
+    this.grabDelay = 0; // Delay before grabbing book from shelf
+    this.grabDelayTime = aggressionLevel === 1 ? 1.0 : aggressionLevel === 2 ? 0.5 : 0.2;
+    this.dropBookMinTime = aggressionLevel === 1 ? 8 : aggressionLevel === 2 ? 5 : 3;
+    this.dropBookMaxTime = aggressionLevel === 1 ? 10 : aggressionLevel === 2 ? 8 : 5;
+    
+    // Detection ranges
+    this.shelfDetectionRange = 128; // 4 tiles - increased for better shelf seeking
+    this.playerDetectionRange = 96; // 3 tiles
+    
+    // Animation
+    this.animationFrame = 0;
+    this.animationTimer = 0;
+    this.facing = 'down';
+  }
+  
+  update(deltaTime) {
+    // Update cooldowns
+    if (this.bookStealCooldown > 0) {
+      this.bookStealCooldown -= deltaTime;
+    }
+    
+    // State machine
+    switch (this.state) {
+      case 'wandering':
+        this.updateWandering(deltaTime);
+        break;
+      case 'fleeing':
+        this.updateFleeing(deltaTime);
+        break;
+      case 'stealing':
+        this.updateStealing(deltaTime);
+        break;
+    }
+    
+    // Update animation
+    if (this.vx !== 0 || this.vy !== 0) {
+      this.animationTimer += deltaTime;
+      if (this.animationTimer >= 0.15) {
+        this.animationFrame = (this.animationFrame + 1) % 4;
+        this.animationTimer = 0;
+      }
+    } else {
+      this.animationFrame = 0;
+    }
+    
+    // Update facing direction
+    if (Math.abs(this.vx) > Math.abs(this.vy)) {
+      this.facing = this.vx > 0 ? 'right' : 'left';
+    } else if (this.vy !== 0) {
+      this.facing = this.vy > 0 ? 'down' : 'up';
+    }
+    
+    // Update book drop timer if carrying
+    if (this.carriedBook) {
+      this.dropBookTimer += deltaTime;
+      // Drop book after time based on aggression level
+      if (this.dropBookTimer > this.dropBookMinTime + Math.random() * (this.dropBookMaxTime - this.dropBookMinTime)) {
+        this.dropBook();
+        this.dropBookTimer = 0;
+        this.state = 'wandering'; // Go find more books to mess with
+      }
+    }
+    
+    // Keep within world bounds
+    const state = this.game.stateManager.currentState;
+    if (state && state.worldWidth && state.worldHeight) {
+      this.x = Math.max(0, Math.min(state.worldWidth - this.width, this.x));
+      this.y = Math.max(0, Math.min(state.worldHeight - this.height, this.y));
+    }
+  }
+  
+  updateWandering(deltaTime) {
+    const state = this.game.stateManager.currentState;
+    if (!state) return;
+    
+    const player = state.player;
+    const shelves = state.shelves || [];
+    
+    // Check for player proximity
+    if (player) {
+      const distToPlayer = this.getDistanceTo(player);
+      if (distToPlayer < this.playerDetectionRange) {
+        this.state = 'fleeing';
+        return;
+      }
+    }
+    
+    // Look for shelves with books to steal
+    if (!this.carriedBook && this.bookStealCooldown <= 0) {
+      for (const shelf of shelves) {
+        const distToShelf = this.getDistanceTo(shelf);
+        if (distToShelf < this.shelfDetectionRange && shelf.books.some(b => b !== null)) {
+          this.target = shelf;
+          this.state = 'stealing';
+          return;
+        }
+      }
+    }
+    
+    // If not carrying a book and cooldown is up, actively seek nearest shelf
+    if (!this.carriedBook && this.bookStealCooldown <= 0 && shelves.length > 0) {
+      // Find nearest shelf with books
+      let nearestShelf = null;
+      let nearestDist = Infinity;
+      
+      for (const shelf of shelves) {
+        if (shelf.books.some(b => b !== null)) {
+          const dist = this.getDistanceTo(shelf);
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestShelf = shelf;
+          }
+        }
+      }
+      
+      if (nearestShelf) {
+        // Move towards nearest shelf
+        const dx = nearestShelf.getCenterX() - this.getCenterX();
+        const dy = nearestShelf.getCenterY() - this.getCenterY();
+        this.direction = Math.atan2(dy, dx);
+      } else {
+        // No shelves with books, move toward center
+        this.directionChangeTimer -= deltaTime;
+        if (this.directionChangeTimer <= 0) {
+          const centerX = state.worldWidth / 2;
+          const centerY = state.worldHeight / 2;
+          const dx = centerX - this.getCenterX();
+          const dy = centerY - this.getCenterY();
+          this.direction = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.5;
+          this.directionChangeTimer = 1.0; // Check more frequently
+        }
+      }
+    } else {
+      // Carrying book - move around to spread chaos
+      this.directionChangeTimer -= deltaTime;
+      if (this.directionChangeTimer <= 0) {
+        // Move away from where we picked up the book
+        if (this.target) {
+          const dx = this.getCenterX() - this.target.getCenterX();
+          const dy = this.getCenterY() - this.target.getCenterY();
+          this.direction = Math.atan2(dy, dx) + (Math.random() - 0.5) * Math.PI / 2;
+        } else {
+          this.direction = Math.random() * Math.PI * 2;
+        }
+        this.directionChangeTimer = 1.5;
+      }
+    }
+    
+    // Move in current direction
+    this.vx = Math.cos(this.direction) * this.speed;
+    this.vy = Math.sin(this.direction) * this.speed;
+    
+    // When hitting edges, turn toward center where shelves are
+    if (state.worldWidth && state.worldHeight) {
+      const margin = 10;
+      if (this.x <= margin || this.x >= state.worldWidth - this.width - margin ||
+          this.y <= margin || this.y >= state.worldHeight - this.height - margin) {
+        // Turn toward center
+        const centerX = state.worldWidth / 2;
+        const centerY = state.worldHeight / 2;
+        const dx = centerX - this.getCenterX();
+        const dy = centerY - this.getCenterY();
+        this.direction = Math.atan2(dy, dx) + (Math.random() - 0.5) * 0.5;
+      }
+    }
+    
+    // Apply movement with collision detection
+    this.applyMovement(deltaTime);
+  }
+  
+  updateFleeing(deltaTime) {
+    const state = this.game.stateManager.currentState;
+    if (!state) return;
+    
+    const player = state.player;
+    
+    // If no player or player is far, just run in a random direction briefly
+    if (!player) {
+      // Run away from where we were for a bit
+      this.vx = Math.cos(this.direction) * this.fleeSpeed;
+      this.vy = Math.sin(this.direction) * this.fleeSpeed;
+      this.applyMovement(deltaTime);
+      
+      // Stop fleeing after 1 second
+      if (!this.fleeTimer) this.fleeTimer = 1;
+      this.fleeTimer -= deltaTime;
+      if (this.fleeTimer <= 0) {
+        this.fleeTimer = null;
+        this.state = 'wandering';
+      }
+      return;
+    }
+    
+    const distToPlayer = this.getDistanceTo(player);
+    
+    // Stop fleeing if far enough away
+    if (distToPlayer > this.playerDetectionRange * 1.5) {
+      this.state = 'wandering';
+      return;
+    }
+    
+    // Run away from player
+    const dx = this.getCenterX() - player.getCenterX();
+    const dy = this.getCenterY() - player.getCenterY();
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 0) {
+      this.vx = (dx / dist) * this.fleeSpeed;
+      this.vy = (dy / dist) * this.fleeSpeed;
+    }
+    
+    // Apply movement with collision detection
+    this.applyMovement(deltaTime);
+    
+    // Drop book if carrying one (scared)
+    if (this.carriedBook && Math.random() < 2.0 * deltaTime) { // 200% chance per second (almost immediately)
+      this.dropBook();
+    }
+  }
+  
+  updateStealing(deltaTime) {
+    if (!this.target || this.carriedBook) {
+      this.state = 'wandering';
+      return;
+    }
+    
+    const state = this.game.stateManager.currentState;
+    const player = state ? state.player : null;
+    
+    // Check for player proximity
+    if (player) {
+      const distToPlayer = this.getDistanceTo(player);
+      if (distToPlayer < this.playerDetectionRange) {
+        this.state = 'fleeing';
+        return;
+      }
+    }
+    
+    // Move towards target shelf
+    const dx = this.target.getCenterX() - this.getCenterX();
+    const dy = this.target.getCenterY() - this.getCenterY();
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    // Use rectangle-based proximity check instead of center distance
+    if (!this.isNearShelf(this.target, 5)) { // 5 pixels - must be touching
+      // Move towards shelf
+      this.vx = (dx / dist) * this.speed;
+      this.vy = (dy / dist) * this.speed;
+      // Apply movement with collision detection
+      this.applyMovement(deltaTime);
+    } else {
+      // Near shelf (any side), wait a moment then steal a book
+      if (this.grabDelay <= 0) {
+        this.grabDelay = this.grabDelayTime; // Grab delay based on aggression
+      }
+      
+      this.grabDelay -= deltaTime;
+      
+      if (this.grabDelay <= 0) {
+        const book = this.target.removeRandomBook();
+        if (book) {
+        // Book has already been removed from shelf and unshelved
+        // 50/50 chance: knock to floor or carry away
+        if (Math.random() < 0.5) {
+          // Just knock it to the floor
+          // Book is already unshelved by removeRandomBook
+          // Drop book outside of shelf bounds to prevent it landing inside
+          const dropDirection = Math.random() < 0.5 ? -1 : 1; // Left or right
+          book.x = dropDirection < 0 ? 
+            this.target.x - book.width - 10 : // Drop to left of shelf
+            this.target.x + this.target.width + 10; // Drop to right of shelf
+          book.y = this.target.y + this.target.height / 2; // Middle height
+          book.vx = dropDirection * (50 + Math.random() * 50); // Push away from shelf
+          book.vy = Math.random() * 50 + 50;
+          book.visible = true; // Ensure book is visible
+        } else {
+          // Pick it up and carry it
+          this.carriedBook = book;
+          book.isHeld = true;
+          book.holder = this;
+          book.visible = true; // Ensure book is visible
+        }
+          this.bookStealCooldown = this.bookStealCooldownTime;
+          // Flee after stealing to create chaos elsewhere
+          this.state = 'fleeing';
+        } else {
+          // No books to steal, go back to wandering
+          this.state = 'wandering';
+          this.bookStealCooldown = 1; // Short cooldown before trying again
+        }
+        this.target = null;
+        this.grabDelay = 0; // Reset grab delay
+      }
+    }
+  }
+  
+  render(ctx, interpolation) {
+    const sprite = this.game.assetLoader.getImage('kid');
+    
+    if (sprite) {
+      // Draw sprite
+      this.game.renderer.drawSprite(
+        sprite,
+        this.x,
+        this.y,
+        this.width,
+        this.height
+      );
+    } else {
+      // Fallback rendering with aggression-based colors
+      ctx.save();
+      
+      // Different colors based on aggression level
+      if (this.aggressionLevel === 1) {
+        ctx.fillStyle = '#ffa5a5'; // Light pink for easy kids
+      } else if (this.aggressionLevel === 2) {
+        ctx.fillStyle = '#ff6b6b'; // Normal red for normal kids
+      } else {
+        ctx.fillStyle = '#cc0000'; // Dark red for aggressive kids
+      }
+      
+      ctx.fillRect(this.x, this.y, this.width, this.height);
+      
+      // Draw simple face
+      ctx.fillStyle = '#000';
+      ctx.fillRect(this.x + 6, this.y + 8, 4, 4); // Left eye
+      ctx.fillRect(this.x + 14, this.y + 8, 4, 4); // Right eye
+      
+      // Mischievous smile (bigger for more aggressive)
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const smileRadius = 3 + this.aggressionLevel;
+      ctx.arc(this.getCenterX(), this.y + 20, smileRadius, 0, Math.PI);
+      ctx.stroke();
+      
+      // Add aggression indicators
+      if (this.aggressionLevel >= 2) {
+        // Angry eyebrows for normal/aggressive kids
+        ctx.beginPath();
+        ctx.moveTo(this.x + 4, this.y + 6);
+        ctx.lineTo(this.x + 10, this.y + 8);
+        ctx.moveTo(this.x + 20, this.y + 6);
+        ctx.lineTo(this.x + 14, this.y + 8);
+        ctx.stroke();
+      }
+      
+      if (this.aggressionLevel === 3) {
+        // Speed lines for aggressive kids
+        ctx.strokeStyle = '#ff0000';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(this.x - 5, this.y + 10);
+        ctx.lineTo(this.x - 2, this.y + 10);
+        ctx.moveTo(this.x - 5, this.y + 16);
+        ctx.lineTo(this.x - 2, this.y + 16);
+        ctx.moveTo(this.x - 5, this.y + 22);
+        ctx.lineTo(this.x - 2, this.y + 22);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
+    
+    // Draw carried book above head
+    if (this.carriedBook) {
+      this.carriedBook.x = this.x + (this.width - this.carriedBook.width) / 2;
+      this.carriedBook.y = this.y - this.carriedBook.height - 4;
+      this.carriedBook.render(ctx, interpolation);
+    }
+  }
+  
+  dropBook() {
+    if (this.carriedBook) {
+      const book = this.carriedBook;
+      book.isHeld = false;
+      book.holder = null;
+      book.isShelved = false; // CRITICAL: Ensure book is marked as not shelved
+      book.visible = true; // Ensure book remains visible
+      
+      // Check if we're near any shelf and adjust drop position
+      const state = this.game.stateManager.currentState;
+      let dropX = this.x + (this.width - book.width) / 2;
+      let dropY = this.y + this.height;
+      
+      if (state && state.shelves) {
+        // Check if drop position would be inside any shelf
+        for (const shelf of state.shelves) {
+          if (dropX >= shelf.x - 10 && dropX <= shelf.x + shelf.width + 10 &&
+              dropY >= shelf.y - 10 && dropY <= shelf.y + shelf.height + 10) {
+            // Would drop inside shelf, move it outside
+            if (this.x < shelf.x + shelf.width / 2) {
+              dropX = shelf.x - book.width - 20; // Drop to left
+            } else {
+              dropX = shelf.x + shelf.width + 20; // Drop to right
+            }
+            break;
+          }
+        }
+      }
+      
+      book.x = dropX;
+      book.y = dropY;
+      
+      // Give book a little random velocity
+      book.vx = (Math.random() - 0.5) * 100;
+      book.vy = Math.random() * 50 + 50;
+      
+      this.carriedBook = null;
+    }
+  }
+  
+  getDistanceTo(entity) {
+    const dx = this.getCenterX() - entity.getCenterX();
+    const dy = this.getCenterY() - entity.getCenterY();
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  
+  applyMovement(deltaTime) {
+    const state = this.game.stateManager.currentState;
+    if (!state || !state.shelves) {
+      // No collision detection available, just move
+      this.x += this.vx * deltaTime;
+      this.y += this.vy * deltaTime;
+      return;
+    }
+    
+    // Calculate new position
+    const newX = this.x + this.vx * deltaTime;
+    const newY = this.y + this.vy * deltaTime;
+    
+    // Check collisions with shelves
+    let canMoveX = true;
+    let canMoveY = true;
+    
+    for (const shelf of state.shelves) {
+      // Check X movement
+      if (this.checkCollision(newX, this.y, shelf)) {
+        canMoveX = false;
+      }
+      // Check Y movement
+      if (this.checkCollision(this.x, newY, shelf)) {
+        canMoveY = false;
+      }
+    }
+    
+    // Apply movement if no collision
+    if (canMoveX) {
+      this.x = newX;
+    } else {
+      // Bounce off in opposite direction
+      this.vx = -this.vx * 0.5;
+      if (this.state === 'wandering') {
+        this.direction = Math.PI - this.direction;
+      }
+    }
+    
+    if (canMoveY) {
+      this.y = newY;
+    } else {
+      // Bounce off in opposite direction
+      this.vy = -this.vy * 0.5;
+      if (this.state === 'wandering') {
+        this.direction = -this.direction;
+      }
+    }
+  }
+  
+  isNearShelf(shelf, distance) {
+    // Check if kid is within distance of any edge of the shelf
+    const kidLeft = this.x;
+    const kidRight = this.x + this.width;
+    const kidTop = this.y;
+    const kidBottom = this.y + this.height;
+    
+    const shelfLeft = shelf.x;
+    const shelfRight = shelf.x + shelf.width;
+    const shelfTop = shelf.y;
+    const shelfBottom = shelf.y + shelf.height;
+    
+    // Expand shelf bounds by distance
+    const expandedLeft = shelfLeft - distance;
+    const expandedRight = shelfRight + distance;
+    const expandedTop = shelfTop - distance;
+    const expandedBottom = shelfBottom + distance;
+    
+    // Check if kid overlaps with expanded bounds
+    return !(kidLeft >= expandedRight || 
+             kidRight <= expandedLeft || 
+             kidTop >= expandedBottom || 
+             kidBottom <= expandedTop);
+  }
+  
+  checkCollision(x, y, entity) {
+    // Check if entity has a collision box
+    if (!entity.collisionBox) {
+      return false;
+    }
+    
+    // Calculate kid's bounds at new position
+    const kidLeft = x;
+    const kidRight = x + this.width;
+    const kidTop = y;
+    const kidBottom = y + this.height;
+    
+    // Calculate entity's collision bounds
+    const entityLeft = entity.x + entity.collisionBox.offsetX;
+    const entityRight = entityLeft + entity.collisionBox.width;
+    const entityTop = entity.y + entity.collisionBox.offsetY;
+    const entityBottom = entityTop + entity.collisionBox.height;
+    
+    // Check for overlap
+    return !(kidLeft >= entityRight || 
+             kidRight <= entityLeft || 
+             kidTop >= entityBottom || 
+             kidBottom <= entityTop);
+  }
+  
+  getUnstuck() {
+    const state = this.game.stateManager.currentState;
+    if (!state) return;
+    
+    // If near edges, move towards center
+    if (state.worldWidth && state.worldHeight) {
+      const centerX = state.worldWidth / 2;
+      const centerY = state.worldHeight / 2;
+      
+      // Calculate direction towards center
+      const dx = centerX - this.x;
+      const dy = centerY - this.y;
+      this.direction = Math.atan2(dy, dx);
+      
+      // Add some randomness
+      this.direction += (Math.random() - 0.5) * Math.PI / 4;
+      
+      // Force movement
+      this.vx = Math.cos(this.direction) * this.speed;
+      this.vy = Math.sin(this.direction) * this.speed;
+      
+      // Try to teleport slightly if really stuck
+      if (this.x < 50 || this.x > state.worldWidth - 50 - this.width ||
+          this.y < 50 || this.y > state.worldHeight - 50 - this.height) {
+        this.x = Math.max(100, Math.min(state.worldWidth - 100 - this.width, this.x));
+        this.y = Math.max(100, Math.min(state.worldHeight - 100 - this.height, this.y));
+      }
+    }
+    
+    // Reset state to wandering
+    this.state = 'wandering';
+    this.target = null;
+  }
+}
