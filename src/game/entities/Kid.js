@@ -356,13 +356,21 @@ export class Kid extends Entity {
     }
     
     if (sprite) {
-      // Draw sprite with direction flipping
+      // Calculate proper dimensions to maintain aspect ratio
+      const targetHeight = this.height; // Keep height consistent
+      const aspectRatio = sprite.width / sprite.height;
+      const targetWidth = targetHeight * aspectRatio;
+      
+      // Center the sprite horizontally within the entity bounds
+      const xOffset = (this.width - targetWidth) / 2;
+      
+      // Draw sprite with direction flipping and proper aspect ratio
       this.game.renderer.drawSprite(
         sprite,
-        this.x,
+        this.x + xOffset,
         this.y,
-        this.width,
-        this.height,
+        targetWidth,
+        targetHeight,
         {
           flipX: this.facing === 'right' // Flip when facing right
         }
@@ -425,7 +433,8 @@ export class Kid extends Entity {
     
     // Draw carried book above head
     if (this.carriedBook) {
-      this.carriedBook.x = this.x + (this.width - this.carriedBook.width) / 2;
+      // Center book above the kid's actual sprite (accounting for aspect ratio)
+      this.carriedBook.x = this.getCenterX() - this.carriedBook.width / 2;
       this.carriedBook.y = this.y - this.carriedBook.height - 4;
       this.carriedBook.render(ctx, interpolation);
     }
