@@ -25,7 +25,16 @@ export class PlayingState extends State {
     // Kid spawning
     this.kidSpawnTimer = 0;
     this.kidSpawnInterval = 15; // Constant 15 seconds between spawns
-    this.maxKids = 20; // Limit kids to prevent performance issues
+    this.maxKids = 3; // Starting max, will increase with waves
+    this.lastMaxKids = 3; // Track previous max to detect increases
+    
+    // Wave notification
+    this.maxKidsIncreaseNotification = {
+      active: false,
+      increase: 0,
+      timer: 0,
+      duration: 3 // Show for 3 seconds
+    }
     
     // Performance optimizations
     this.floorPattern = null; // Cache floor pattern
@@ -248,10 +257,23 @@ export class PlayingState extends State {
     }).length;
     const totalChaosBooks = booksOnFloor + booksHeldByKids;
     
-    // Simple constant chaos scaling: 0.05% per book per second
+    // Sliding chaos rate based on game progression
     let chaosRate = 0;
     if (totalChaosBooks > 0) {
-      chaosRate = totalChaosBooks * 0.05; // 0.05% per book per second
+      // Calculate game time in minutes
+      const minutes = gameData.elapsedTime / 60;
+      
+      // Determine chaos rate per book based on time
+      let chaosPerBook;
+      if (minutes < 3) {
+        chaosPerBook = 0.05; // 0-3 minutes: 0.05% per book per second
+      } else if (minutes < 5) {
+        chaosPerBook = 0.03; // 3-5 minutes: 0.03% per book per second
+      } else {
+        chaosPerBook = 0.01; // 5+ minutes: 0.01% per book per second
+      }
+      
+      chaosRate = totalChaosBooks * chaosPerBook;
       
       // Apply chaos dampening from upgrades
       const chaosDampening = this.player?.stats?.chaosDampening || 0;
@@ -367,6 +389,36 @@ export class PlayingState extends State {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`CHAOS: ${Math.floor(gameData.chaosLevel)}%`, width / 2, meterY + meterHeight / 2);
+    
+    // Wave increase notification below chaos meter
+    if (this.maxKidsIncreaseNotification.active) {
+      const notificationY = meterY + meterHeight + 15;
+      const fadeProgress = this.maxKidsIncreaseNotification.timer / this.maxKidsIncreaseNotification.duration;
+      let alpha;
+      
+      // Fade in for first 0.5 seconds, stay solid, then fade out in last 0.5 seconds
+      if (fadeProgress < 0.5 / 3) {
+        alpha = fadeProgress * 6; // Fade in
+      } else if (fadeProgress > 2.5 / 3) {
+        alpha = (1 - fadeProgress) * 6; // Fade out
+      } else {
+        alpha = 1; // Solid
+      }
+      
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = 'bold 18px Arial';
+      ctx.fillStyle = '#ffff00'; // Yellow color for visibility
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 3;
+      
+      const notificationText = `Maximum kids allowed grew by ${this.maxKidsIncreaseNotification.increase}`;
+      
+      // Draw text outline for better visibility
+      ctx.strokeText(notificationText, width / 2, notificationY);
+      ctx.fillText(notificationText, width / 2, notificationY);
+      ctx.restore();
+    }
     
     // Top Right - Timer and Kid Counter
     const timeRemaining = Math.max(0, gameData.targetTime - gameData.elapsedTime);
@@ -522,6 +574,49 @@ export class PlayingState extends State {
   }
   
   updateKidSpawning(deltaTime) {
+    // Calculate current game time in minutes
+    const minutes = this.game.gameData.elapsedTime / 60;
+    
+    // Determine max kids based on wave progression
+    let newMaxKids;
+    if (minutes < 1) {
+      newMaxKids = 3; // First minute: max 3
+    } else if (minutes < 3) {
+      newMaxKids = 5; // 1-3 minutes: max 5
+    } else if (minutes < 5) {
+      newMaxKids = 7; // 3-5 minutes: max 7
+    } else if (minutes < 10) {
+      newMaxKids = 10; // 5-10 minutes: max 10
+    } else {
+      // After 10 minutes: increase by 2 every minute
+      const additionalMinutes = Math.floor(minutes - 10);
+      newMaxKids = 10 + (additionalMinutes * 2);
+    }
+    
+    // Check if max kids increased
+    if (newMaxKids > this.maxKids) {
+      const increase = newMaxKids - this.maxKids;
+      this.maxKids = newMaxKids;
+      
+      // Trigger notification
+      this.maxKidsIncreaseNotification = {
+        active: true,
+        increase: increase,
+        timer: 0,
+        duration: 3
+      };
+      
+      console.log(`[WAVE SYSTEM] Max kids increased to ${this.maxKids} (+${increase})`);
+    }
+    
+    // Update notification timer
+    if (this.maxKidsIncreaseNotification.active) {
+      this.maxKidsIncreaseNotification.timer += deltaTime;
+      if (this.maxKidsIncreaseNotification.timer >= this.maxKidsIncreaseNotification.duration) {
+        this.maxKidsIncreaseNotification.active = false;
+      }
+    }
+    
     // Don't spawn more kids if we're at the limit
     if (this.kids.length >= this.maxKids) {
       return;
@@ -530,26 +625,20 @@ export class PlayingState extends State {
     // Update spawn timer
     this.kidSpawnTimer -= deltaTime;
     
-    // Calculate current game time
-    const minutes = this.game.gameData.elapsedTime / 60;
-    
     if (this.kidSpawnTimer <= 0) {
       // Determine aggression level based on time
       let aggressionLevel = 1; // Easy by default
-      let spawnInterval = 15; // Default 15 seconds
+      let spawnInterval = 15; // Always 15 seconds
       
       if (minutes >= 15) {
-        // After 15 minutes: more aggressive kids, slightly faster spawning
+        // After 15 minutes: more aggressive kids
         aggressionLevel = 3;
-        spawnInterval = 12; // Spawn every 12 seconds
       } else if (minutes >= 10) {
-        // 10-15 minutes: aggressive kids, normal spawning
+        // 10-15 minutes: aggressive kids
         aggressionLevel = 3;
-        spawnInterval = 15;
       } else if (minutes >= 5) {
         // 5-10 minutes: normal kids
         aggressionLevel = 2;
-        spawnInterval = 15;
       }
       
       // Spawn a new kid
@@ -561,7 +650,7 @@ export class PlayingState extends State {
       this.kidSpawnTimer = spawnInterval;
       this.kidSpawnInterval = spawnInterval;
       
-      console.log(`[KID SPAWNING] Spawned kid #${this.kids.length} (aggression: ${aggressionLevel}) - Next spawn in ${spawnInterval}s`);
+      console.log(`[KID SPAWNING] Spawned kid #${this.kids.length}/${this.maxKids} (aggression: ${aggressionLevel}) - Next spawn in ${spawnInterval}s`);
     }
   }
   
@@ -724,6 +813,11 @@ export class PlayingState extends State {
     while (gameData.xp >= gameData.xpToNext) {
       gameData.xp -= gameData.xpToNext;
       gameData.playerLevel++;
+      
+      // Refill stamina as a level up bonus
+      if (this.player) {
+        this.player.stats.stamina = this.player.stats.maxStamina;
+      }
       
       // Calculate next level XP requirement
       gameData.xpToNext = Math.floor(100 * Math.pow(1.45, gameData.playerLevel - 1));
