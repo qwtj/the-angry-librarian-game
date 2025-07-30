@@ -49,7 +49,11 @@ export class Game {
       xpToNext: 100,
       elapsedTime: 0,
       targetTime: 30 * 60, // 30 minutes in seconds
-      isPaused: false
+      isPaused: false,
+      // Stats tracking
+      booksCollected: 0,
+      booksShelved: 0,
+      kidsRepelled: 0
     };
   }
   

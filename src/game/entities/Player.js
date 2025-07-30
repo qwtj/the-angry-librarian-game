@@ -221,6 +221,46 @@ export class Player extends Entity {
       }
     );
     
+    // Draw pickup radius indicator when Long Arms upgrade is active
+    if (this.upgradeLevels?.pickupRadius > 0) {
+      ctx.save();
+      
+      // Enhanced pulsing effect
+      const pulseScale = 1 + Math.sin(Date.now() * 0.003) * 0.05;
+      const radius = this.stats.pickupRadius * 32 * pulseScale;
+      const centerX = this.getCenterX();
+      const centerY = this.getCenterY();
+      
+      // Outer glow circle
+      ctx.strokeStyle = 'rgba(100, 200, 255, 0.1)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Main circle with gradient
+      const gradient = ctx.createRadialGradient(centerX, centerY, radius - 10, centerX, centerY, radius);
+      gradient.addColorStop(0, 'rgba(100, 200, 255, 0.1)');
+      gradient.addColorStop(1, 'rgba(100, 200, 255, 0.3)');
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 3;
+      ctx.setLineDash([8, 4]); // Dashed line
+      
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Inner bright circle for emphasis
+      ctx.strokeStyle = 'rgba(150, 220, 255, 0.25)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]); // Solid line
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius - 4, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
     // Draw pickup radius (debug)
     if (this.game.debug.showCollisionBoxes) {
       ctx.save();
@@ -335,6 +375,9 @@ export class Player extends Entity {
         break;
       case 'pickupRadius':
         this.stats.pickupRadius += amount;
+        break;
+      case 'returnRadius':
+        this.stats.returnRadius += amount;
         break;
       case 'carrySlots':
         this.stats.carrySlots += amount;

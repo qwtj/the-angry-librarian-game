@@ -190,7 +190,11 @@ export class UpgradeSelectionState extends State {
       // Effect preview
       ctx.font = 'bold 16px Arial';
       ctx.fillStyle = '#00ff00';
-      ctx.fillText(upgrade.getDescription(currentLevel + 1), cardX + cardWidth / 2, cardY + 220);
+      const effectText = upgrade.getDescription(currentLevel + 1);
+      const effectLines = this.wrapText(effectText, cardWidth - 20, 'bold 16px Arial');
+      effectLines.forEach((line, i) => {
+        ctx.fillText(line, cardX + cardWidth / 2, cardY + 210 + i * 20);
+      });
     });
     
     // Instructions
@@ -234,13 +238,14 @@ export class UpgradeSelectionState extends State {
     this.game.stateManager.popState();
   }
   
-  wrapText(text, maxWidth) {
+  wrapText(text, maxWidth, font = '14px Arial') {
     const words = text.split(' ');
     const lines = [];
     let currentLine = '';
     
     const ctx = this.game.ctx;
-    ctx.font = '14px Arial';
+    const savedFont = ctx.font;
+    ctx.font = font;
     
     for (const word of words) {
       const testLine = currentLine + (currentLine ? ' ' : '') + word;
@@ -258,6 +263,7 @@ export class UpgradeSelectionState extends State {
       lines.push(currentLine);
     }
     
+    ctx.font = savedFont; // Restore original font
     return lines;
   }
   

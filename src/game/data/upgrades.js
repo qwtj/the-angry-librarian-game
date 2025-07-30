@@ -22,8 +22,9 @@ export const UPGRADES = {
     maxLevel: 10,
     effect: (player, level) => {
       player.upgrade('pickupRadius', 0.1);
+      player.upgrade('returnRadius', 0.1);
     },
-    getDescription: (level) => `+${(0.1 * level).toFixed(1)}m Pickup Radius`
+    getDescription: (level) => `+${(0.1 * level).toFixed(1)}m Pickup/Return Radius`
   },
   
   carrySlots: {

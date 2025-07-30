@@ -12,6 +12,10 @@ export class GameOverState extends State {
     ];
     this.selectedIndex = 0;
     this.selectSound = null;
+    
+    // Video background
+    this.video = null;
+    this.videoLoaded = false;
   }
   
   enter(data) {
@@ -32,16 +36,56 @@ export class GameOverState extends State {
       uhOhSound.play().catch(e => console.log('Uh oh sound play failed:', e));
     }
     
+    // Create and setup video if not already created
+    if (!this.video) {
+      this.video = document.createElement('video');
+      this.video.src = '/menu_background.mp4';
+      this.video.loop = true;
+      this.video.muted = true;
+      this.video.autoplay = true;
+      
+      // Handle various video events for better reliability
+      this.video.addEventListener('canplay', () => {
+        this.videoLoaded = true;
+        this.video.play().catch(e => console.log('Video play failed:', e));
+      });
+      
+      // Also try playing on loadedmetadata
+      this.video.addEventListener('loadedmetadata', () => {
+        this.video.play().catch(e => console.log('Video play on metadata failed:', e));
+      });
+      
+      // Handle errors
+      this.video.addEventListener('error', (e) => {
+        console.error('Video loading error:', e);
+        this.videoLoaded = false;
+      });
+      
+      // Force load the video
+      this.video.load();
+    } else {
+      // Resume playing if returning to game over screen
+      this.videoLoaded = true; // Assume it's loaded if we already created it
+      this.video.play().catch(e => console.log('Video play failed:', e));
+    }
+    
     // Collect game stats
     const gameData = this.game.gameData;
     this.stats = {
       timeElapsed: Math.floor(gameData.elapsedTime),
       level: gameData.playerLevel,
       chaosLevel: Math.floor(gameData.chaosLevel),
-      booksCollected: 0, // TODO: Track this
-      booksShelved: 0, // TODO: Track this
-      kidsRepelled: 0, // TODO: Track this
+      booksCollected: gameData.booksCollected || 0,
+      booksShelved: gameData.booksShelved || 0,
+      kidsRepelled: gameData.kidsRepelled || 0,
     };
+  }
+  
+  exit() {
+    // Pause video when leaving game over screen
+    if (this.video) {
+      this.video.pause();
+    }
   }
   
   update(deltaTime) {
@@ -66,14 +110,14 @@ export class GameOverState extends State {
     const mousePos = input.getMousePosition();
     if (mousePos) {
       const { width, height } = this.game;
-      const boxWidth = 600;
-      const boxHeight = 500;
+      const boxWidth = 700;
+      const boxHeight = 600;
       const boxX = (width - boxWidth) / 2;
       const boxY = (height - boxHeight) / 2;
       
       // Check each menu item
       for (let i = 0; i < this.menuItems.length; i++) {
-        const y = boxY + 380 + i * 50;
+        const y = boxY + 480 + i * 50;
         const itemTop = y - 20;
         const itemBottom = y + 20;
         const itemLeft = boxX + 150;
@@ -101,22 +145,71 @@ export class GameOverState extends State {
     const ctx = renderer.ctx;
     const { width, height } = this.game;
     
-    // Background
-    ctx.fillStyle = this.won ? '#4169E1' : '#8B0000';
-    ctx.fillRect(0, 0, width, height);
+    // Draw video background if loaded
+    if (this.video && this.videoLoaded && !this.video.paused) {
+      try {
+        // Scale video to cover the entire canvas
+        const videoAspect = this.video.videoWidth / this.video.videoHeight;
+        const canvasAspect = width / height;
+        
+        let drawWidth, drawHeight, drawX, drawY;
+        
+        if (videoAspect > canvasAspect) {
+          // Video is wider - fit height, crop width
+          drawHeight = height;
+          drawWidth = height * videoAspect;
+          drawX = (width - drawWidth) / 2;
+          drawY = 0;
+        } else {
+          // Video is taller - fit width, crop height
+          drawWidth = width;
+          drawHeight = width / videoAspect;
+          drawX = 0;
+          drawY = (height - drawHeight) / 2;
+        }
+        
+        ctx.drawImage(this.video, drawX, drawY, drawWidth, drawHeight);
+      } catch (e) {
+        // Fallback to solid color if video fails
+        ctx.fillStyle = this.won ? '#4169E1' : '#8B0000';
+        ctx.fillRect(0, 0, width, height);
+      }
+    } else {
+      // Fallback background color
+      ctx.fillStyle = this.won ? '#4169E1' : '#8B0000';
+      ctx.fillRect(0, 0, width, height);
+    }
     
-    // Result box
-    const boxWidth = 600;
-    const boxHeight = 500;
+    // Result box with rounded corners
+    const boxWidth = 700;
+    const boxHeight = 600;
     const boxX = (width - boxWidth) / 2;
     const boxY = (height - boxHeight) / 2;
+    const borderRadius = 20;
     
-    ctx.fillStyle = '#f5e6d3';
-    ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+    // Helper function to draw rounded rectangle
+    const drawRoundedRect = (x, y, width, height, radius) => {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    };
+    
+    // Draw box background with transparency
+    drawRoundedRect(boxX, boxY, boxWidth, boxHeight, borderRadius);
+    ctx.fillStyle = 'rgba(245, 230, 211, 0.9)'; // Semi-transparent
+    ctx.fill();
     
     ctx.strokeStyle = '#3d2914';
     ctx.lineWidth = 4;
-    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+    ctx.stroke();
     
     ctx.save();
     ctx.textAlign = 'center';
@@ -167,7 +260,7 @@ export class GameOverState extends State {
     ctx.textAlign = 'center';
     ctx.font = '32px Arial';
     this.menuItems.forEach((item, index) => {
-      const y = boxY + 380 + index * 50;
+      const y = boxY + 480 + index * 50;
       
       if (index === this.selectedIndex) {
         ctx.fillStyle = '#8B4513';

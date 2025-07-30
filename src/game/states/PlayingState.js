@@ -57,7 +57,11 @@ export class PlayingState extends State {
       xpToNext: 100,
       elapsedTime: 0,
       targetTime: 30 * 60,
-      isPaused: false
+      isPaused: false,
+      // Stats tracking
+      booksCollected: 0,
+      booksShelved: 0,
+      kidsRepelled: 0
     };
     
     console.log(`[KID SPAWNING] World dimensions: ${this.worldWidth}x${this.worldHeight}`);
@@ -644,6 +648,9 @@ export class PlayingState extends State {
         if (this.player.pickupBook(book)) {
           book.pickup(this.player);
           
+          // Track book collection
+          this.game.gameData.booksCollected++;
+          
           // Reduce chaos when picking up (balanced with new rates)
           this.game.gameData.chaosLevel -= 0.5; // Much smaller reduction
           this.game.gameData.chaosLevel = Math.max(0, this.game.gameData.chaosLevel);
@@ -669,6 +676,9 @@ export class PlayingState extends State {
         // Try to shelve matching books
         const book = this.player.shelveBook(shelf);
         if (book && shelf.addBook(book)) {
+          // Track book shelving
+          this.game.gameData.booksShelved++;
+          
           // Reduce chaos when shelving (bigger reward for completing the task)
           this.game.gameData.chaosLevel -= 1.0; // Reduced to match new chaos rates
           this.game.gameData.chaosLevel = Math.max(0, this.game.gameData.chaosLevel);
@@ -829,6 +839,9 @@ export class PlayingState extends State {
         // Give book to player
         if (this.player.pickupBook(book)) {
           book.pickup(this.player);
+          
+          // Track book collection
+          this.game.gameData.booksCollected++;
           
           // Kid flees after being robbed
           kid.state = 'fleeing';

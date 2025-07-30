@@ -111,6 +111,10 @@ export class Kid extends Entity {
     if (player) {
       const distToPlayer = this.getDistanceTo(player);
       if (distToPlayer < this.playerDetectionRange) {
+        // Track kid being repelled
+        if (this.state !== 'fleeing') {
+          this.game.gameData.kidsRepelled++;
+        }
         this.state = 'fleeing';
         this.playLaughingSound();
         return;
@@ -271,6 +275,10 @@ export class Kid extends Entity {
     if (player) {
       const distToPlayer = this.getDistanceTo(player);
       if (distToPlayer < this.playerDetectionRange) {
+        // Track kid being repelled
+        if (this.state !== 'fleeing') {
+          this.game.gameData.kidsRepelled++;
+        }
         this.state = 'fleeing';
         this.playLaughingSound();
         return;
