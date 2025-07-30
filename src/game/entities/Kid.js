@@ -469,6 +469,14 @@ export class Kid extends Entity {
         }
       }
       
+      // Ensure book is dropped within playable bounds
+      if (state && state.worldWidth && state.worldHeight) {
+        // Keep book at least 50 pixels from edges
+        const margin = 50;
+        dropX = Math.max(margin, Math.min(state.worldWidth - book.width - margin, dropX));
+        dropY = Math.max(margin, Math.min(state.worldHeight - book.height - margin, dropY));
+      }
+      
       book.x = dropX;
       book.y = dropY;
       

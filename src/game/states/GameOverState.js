@@ -11,12 +11,26 @@ export class GameOverState extends State {
       { text: 'Main Menu', action: () => this.mainMenu() }
     ];
     this.selectedIndex = 0;
+    this.selectSound = null;
   }
   
   enter(data) {
     this.won = data.won || false;
     this.reason = data.reason || '';
     this.selectedIndex = 0;
+    
+    // Initialize select sound if not already created
+    if (!this.selectSound) {
+      this.selectSound = new Audio('/menu_select.mp3');
+      this.selectSound.volume = 0.7;
+    }
+    
+    // Play "uh oh" sound if player lost
+    if (!this.won) {
+      const uhOhSound = new Audio('/uh_oh.mp3');
+      uhOhSound.volume = 0.6;
+      uhOhSound.play().catch(e => console.log('Uh oh sound play failed:', e));
+    }
     
     // Collect game stats
     const gameData = this.game.gameData;
@@ -36,14 +50,50 @@ export class GameOverState extends State {
     // Menu navigation
     if (input.isKeyPressed('ArrowUp') || input.isKeyPressed('w')) {
       this.selectedIndex = (this.selectedIndex - 1 + this.menuItems.length) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('ArrowDown') || input.isKeyPressed('s')) {
       this.selectedIndex = (this.selectedIndex + 1) % this.menuItems.length;
+      this.playSelectSound();
     }
     
     if (input.isKeyPressed('Enter') || input.isKeyPressed(' ')) {
       this.menuItems[this.selectedIndex].action();
+    }
+    
+    // Mouse support
+    const mousePos = input.getMousePosition();
+    if (mousePos) {
+      const { width, height } = this.game;
+      const boxWidth = 600;
+      const boxHeight = 500;
+      const boxX = (width - boxWidth) / 2;
+      const boxY = (height - boxHeight) / 2;
+      
+      // Check each menu item
+      for (let i = 0; i < this.menuItems.length; i++) {
+        const y = boxY + 380 + i * 50;
+        const itemTop = y - 20;
+        const itemBottom = y + 20;
+        const itemLeft = boxX + 150;
+        const itemRight = boxX + boxWidth - 150;
+        
+        if (mousePos.x >= itemLeft && mousePos.x <= itemRight &&
+            mousePos.y >= itemTop && mousePos.y <= itemBottom) {
+          // Mouse is over this item
+          if (this.selectedIndex !== i) {
+            this.selectedIndex = i;
+            this.playSelectSound();
+          }
+          
+          // Check for click
+          if (input.isMouseButtonPressed(0)) { // 0 = left mouse button
+            this.menuItems[this.selectedIndex].action();
+          }
+          break;
+        }
+      }
     }
   }
   
@@ -139,5 +189,12 @@ export class GameOverState extends State {
   
   mainMenu() {
     this.game.stateManager.changeState('menu');
+  }
+  
+  playSelectSound() {
+    if (this.selectSound) {
+      this.selectSound.currentTime = 0;
+      this.selectSound.play().catch(e => console.log('Select sound play failed:', e));
+    }
   }
 }
