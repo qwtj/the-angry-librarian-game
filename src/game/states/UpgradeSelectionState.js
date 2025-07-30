@@ -102,7 +102,7 @@ export class UpgradeSelectionState extends State {
             this.playSelectSound();
           }
           
-          if (input.isMousePressed()) {
+          if (input.isMouseButtonPressed(0)) { // 0 = left mouse button
             this.selectUpgrade();
           }
         }

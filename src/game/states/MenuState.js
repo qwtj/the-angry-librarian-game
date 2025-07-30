@@ -34,16 +34,28 @@ export class MenuState extends State {
       this.video.muted = true;
       this.video.autoplay = true;
       
-      // Start playing when loaded
-      this.video.addEventListener('loadeddata', () => {
+      // Handle various video events for better reliability
+      this.video.addEventListener('canplay', () => {
         this.videoLoaded = true;
         this.video.play().catch(e => console.log('Video play failed:', e));
       });
       
-      // Load the video
+      // Also try playing on loadedmetadata
+      this.video.addEventListener('loadedmetadata', () => {
+        this.video.play().catch(e => console.log('Video play on metadata failed:', e));
+      });
+      
+      // Handle errors
+      this.video.addEventListener('error', (e) => {
+        console.error('Video loading error:', e);
+        this.videoLoaded = false;
+      });
+      
+      // Force load the video
       this.video.load();
     } else {
       // Resume playing if returning to menu
+      this.videoLoaded = true; // Assume it's loaded if we already created it
       this.video.play().catch(e => console.log('Video play failed:', e));
     }
     
@@ -88,10 +100,6 @@ export class MenuState extends State {
   update(deltaTime) {
     const input = this.game.inputManager;
     
-    // Debug logging
-    if (input.isKeyPressed('ArrowUp')) console.log('ArrowUp pressed!');
-    if (input.isKeyPressed('ArrowDown')) console.log('ArrowDown pressed!');
-    if (input.isKeyPressed('Enter')) console.log('Enter pressed!');
     
     if (this.showingInstructions) {
       if (input.isKeyPressed('Escape') || input.isKeyPressed('Enter')) {
@@ -102,20 +110,48 @@ export class MenuState extends State {
     
     // Menu navigation
     if (input.isKeyPressed('ArrowUp') || input.isKeyPressed('w')) {
-      console.log('Moving selection up');
       this.selectedIndex = (this.selectedIndex - 1 + this.menuItems.length) % this.menuItems.length;
       this.playSelectSound();
     }
     
     if (input.isKeyPressed('ArrowDown') || input.isKeyPressed('s')) {
-      console.log('Moving selection down');
       this.selectedIndex = (this.selectedIndex + 1) % this.menuItems.length;
       this.playSelectSound();
     }
     
     if (input.isKeyPressed('Enter') || input.isKeyPressed(' ')) {
-      console.log('Selecting menu item:', this.selectedIndex);
       this.menuItems[this.selectedIndex].action();
+    }
+    
+    // Mouse support
+    const mousePos = input.getMousePosition();
+    if (mousePos && !this.showingInstructions) {
+      const { width, height } = this.game;
+      const menuStartY = height * 0.7; // Menu starts at 70% down
+      
+      // Check each menu item
+      for (let i = 0; i < this.menuItems.length; i++) {
+        const y = menuStartY + i * 60;
+        const itemTop = y - 25;
+        const itemBottom = y + 25;
+        const itemLeft = width / 2 - 200;
+        const itemRight = width / 2 + 200;
+        
+        if (mousePos.x >= itemLeft && mousePos.x <= itemRight &&
+            mousePos.y >= itemTop && mousePos.y <= itemBottom) {
+          // Mouse is over this item
+          if (this.selectedIndex !== i) {
+            this.selectedIndex = i;
+            this.playSelectSound();
+          }
+          
+          // Check for click
+          if (input.isMouseButtonPressed(0)) { // 0 = left mouse button
+            this.menuItems[this.selectedIndex].action();
+          }
+          break;
+        }
+      }
     }
   }
   
