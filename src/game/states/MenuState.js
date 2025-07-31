@@ -1,4 +1,5 @@
 import { State } from './State.js';
+import { PlayingState } from './PlayingState.js';
 
 export class MenuState extends State {
   constructor(game) {
@@ -312,6 +313,10 @@ export class MenuState extends State {
   }
   
   startGame() {
+    // Create a fresh PlayingState instance to ensure clean state
+    const freshPlayingState = new PlayingState(this.game);
+    this.game.stateManager.registerState('playing', freshPlayingState);
+    
     this.game.stateManager.changeState('playing');
   }
   

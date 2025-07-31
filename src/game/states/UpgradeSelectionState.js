@@ -50,6 +50,8 @@ export class UpgradeSelectionState extends State {
   exit() {
     // Unpause the game
     this.game.gameData.isPaused = false;
+    // Ensure canvas has focus when returning to gameplay
+    this.game.inputManager.ensureFocus();
   }
   
   update(deltaTime) {

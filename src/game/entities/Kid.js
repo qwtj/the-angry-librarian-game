@@ -462,17 +462,44 @@ export class Kid extends Entity {
       let dropY = this.y + this.height;
       
       if (state && state.shelves) {
-        // Check if drop position would be inside any shelf
+        // Check against ALL shelves, not just the first collision
+        const safetyMargin = 30; // Increased margin for safety
+        
         for (const shelf of state.shelves) {
-          if (dropX >= shelf.x - 10 && dropX <= shelf.x + shelf.width + 10 &&
-              dropY >= shelf.y - 10 && dropY <= shelf.y + shelf.height + 10) {
-            // Would drop inside shelf, move it outside
-            if (this.x < shelf.x + shelf.width / 2) {
-              dropX = shelf.x - book.width - 20; // Drop to left
+          // Check if the book's bounding box would overlap with shelf (with margin)
+          const bookLeft = dropX;
+          const bookRight = dropX + book.width;
+          const bookTop = dropY;
+          const bookBottom = dropY + book.height;
+          
+          const shelfLeft = shelf.x - safetyMargin;
+          const shelfRight = shelf.x + shelf.width + safetyMargin;
+          const shelfTop = shelf.y - safetyMargin;
+          const shelfBottom = shelf.y + shelf.height + safetyMargin;
+          
+          // Check for overlap
+          if (!(bookLeft > shelfRight || bookRight < shelfLeft || 
+                bookTop > shelfBottom || bookBottom < shelfTop)) {
+            // Book would overlap with shelf, find safe position
+            
+            // Calculate distances to each side of the shelf
+            const leftDist = Math.abs(this.getCenterX() - shelf.x);
+            const rightDist = Math.abs(this.getCenterX() - (shelf.x + shelf.width));
+            const topDist = Math.abs(this.getCenterY() - shelf.y);
+            const bottomDist = Math.abs(this.getCenterY() - (shelf.y + shelf.height));
+            
+            // Find the closest edge and drop book there
+            const minDist = Math.min(leftDist, rightDist, topDist, bottomDist);
+            
+            if (minDist === leftDist) {
+              dropX = shelf.x - book.width - safetyMargin;
+            } else if (minDist === rightDist) {
+              dropX = shelf.x + shelf.width + safetyMargin;
+            } else if (minDist === topDist) {
+              dropY = shelf.y - book.height - safetyMargin;
             } else {
-              dropX = shelf.x + shelf.width + 20; // Drop to right
+              dropY = shelf.y + shelf.height + safetyMargin;
             }
-            break;
           }
         }
       }
@@ -488,9 +515,32 @@ export class Kid extends Entity {
       book.x = dropX;
       book.y = dropY;
       
-      // Give book a little random velocity
-      book.vx = (Math.random() - 0.5) * 100;
-      book.vy = Math.random() * 50 + 50;
+      // Give book a little random velocity, but away from shelves
+      // Start with small random velocity
+      book.vx = (Math.random() - 0.5) * 50; // Reduced from 100
+      book.vy = Math.random() * 25 + 25; // Reduced from 50+50
+      
+      // If we adjusted position due to a shelf, add velocity away from it
+      if (state && state.shelves) {
+        for (const shelf of state.shelves) {
+          const distToShelf = Math.sqrt(
+            Math.pow(dropX + book.width/2 - (shelf.x + shelf.width/2), 2) +
+            Math.pow(dropY + book.height/2 - (shelf.y + shelf.height/2), 2)
+          );
+          
+          if (distToShelf < 100) { // If close to a shelf
+            // Add velocity away from shelf center
+            const awayX = (dropX + book.width/2) - (shelf.x + shelf.width/2);
+            const awayY = (dropY + book.height/2) - (shelf.y + shelf.height/2);
+            const awayDist = Math.sqrt(awayX * awayX + awayY * awayY);
+            
+            if (awayDist > 0) {
+              book.vx += (awayX / awayDist) * 30;
+              book.vy += (awayY / awayDist) * 30;
+            }
+          }
+        }
+      }
       
       this.carriedBook = null;
     }

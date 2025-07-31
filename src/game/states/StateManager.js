@@ -47,6 +47,9 @@ export class StateManager {
       this.currentState.exit();
     }
     
+    // Clear any lingering input events
+    this.game.inputManager.clearFrameEvents();
+    
     // Store previous state
     this.previousState = this.currentState;
     
@@ -54,6 +57,11 @@ export class StateManager {
     this.currentState = newState;
     if (this.currentState.enter) {
       this.currentState.enter(data);
+    }
+    
+    // Ensure canvas has focus for gameplay states
+    if (stateName === 'playing') {
+      this.game.inputManager.ensureFocus();
     }
     
     console.log(`State changed to: ${stateName}`);
@@ -110,8 +118,21 @@ export class StateManager {
       this.currentState.exit();
     }
     
+    // Clear any lingering input events
+    this.game.inputManager.clearFrameEvents();
+    
     // Pop previous state from stack
     this.currentState = this.stateStack.pop();
+    
+    // Re-enter the state we're returning to (important for maintaining focus)
+    if (this.currentState && this.currentState.enter) {
+      // For PlayingState, we don't want to reset the game, just unpause
+      if (this.currentState.name === 'playing') {
+        this.game.gameData.isPaused = false;
+        // Ensure canvas has focus when returning to gameplay
+        this.game.inputManager.ensureFocus();
+      }
+    }
     
     console.log(`State popped to: ${this.currentState.name}`);
   }

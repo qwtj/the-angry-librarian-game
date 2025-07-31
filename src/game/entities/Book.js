@@ -49,9 +49,41 @@ export class Book extends Entity {
     this.vx *= this.friction;
     this.vy *= this.friction;
     
+    // Store old position
+    const oldX = this.x;
+    const oldY = this.y;
+    
     // Update position
     this.x += this.vx * deltaTime;
     this.y += this.vy * deltaTime;
+    
+    // Check collision with shelves if not shelved
+    if (!this.isShelved) {
+      const state = this.game.stateManager.currentState;
+      if (state && state.shelves) {
+        for (const shelf of state.shelves) {
+          // Check if book overlaps with shelf
+          if (!(this.x + this.width < shelf.x || 
+                this.x > shelf.x + shelf.width ||
+                this.y + this.height < shelf.y || 
+                this.y > shelf.y + shelf.height)) {
+            // Book collided with shelf, bounce it away
+            this.x = oldX;
+            this.y = oldY;
+            
+            // Reverse velocity and reduce it
+            this.vx = -this.vx * 0.5;
+            this.vy = -this.vy * 0.5;
+            
+            // Add some randomness to prevent getting stuck
+            this.vx += (Math.random() - 0.5) * 20;
+            this.vy += (Math.random() - 0.5) * 20;
+            
+            break; // Only handle first collision
+          }
+        }
+      }
+    }
     
     // Update rotation
     this.rotation += this.rotationSpeed * deltaTime;

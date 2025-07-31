@@ -1,4 +1,5 @@
 import { State } from './State.js';
+import { PlayingState } from './PlayingState.js';
 
 export class PausedState extends State {
   constructor(game) {
@@ -145,6 +146,17 @@ export class PausedState extends State {
   }
   
   restart() {
+    // Clear the state stack to ensure clean restart
+    this.game.stateManager.stateStack = [];
+    
+    // Also clear the current state to ensure we're starting fresh
+    this.game.stateManager.currentState = null;
+    
+    // Force a fresh PlayingState instance to ensure clean state
+    const freshPlayingState = new PlayingState(this.game);
+    this.game.stateManager.registerState('playing', freshPlayingState);
+    
+    // Change to the fresh playing state
     this.game.stateManager.changeState('playing');
   }
   

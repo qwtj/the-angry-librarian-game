@@ -63,20 +63,34 @@ export class InputManager {
     this.canvas.addEventListener('touchend', (e) => this.handleTouchEnd(e));
     this.canvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
     
-    // Handle focus loss - only clear when window truly loses focus
+    // Handle focus loss - be less aggressive about clearing inputs
     let windowHasFocus = true;
     window.addEventListener('blur', (e) => {
-      // Only clear inputs if we're actually losing window focus (e.g., switching tabs)
-      // Not when just clicking within the same page
+      // Only clear held keys to prevent stuck keys, but keep other state
       if (document.hasFocus() === false) {
-        console.log('Window lost focus, clearing inputs');
+        console.log('Window lost focus, clearing held keys');
         windowHasFocus = false;
-        this.clearAllInputs();
+        // Only clear currently held keys, not all input state
+        this.keys.clear();
+        this.mouse.buttons.clear();
+        // Don't clear frameKeyPresses/frameKeyReleases as they'll be cleared next frame anyway
       }
     });
     
     window.addEventListener('focus', () => {
+      console.log('Window regained focus');
       windowHasFocus = true;
+      // Refocus canvas when window regains focus
+      this.canvas.focus();
+    });
+    
+    // Also handle canvas blur/focus
+    this.canvas.addEventListener('blur', () => {
+      console.log('Canvas lost focus');
+    });
+    
+    this.canvas.addEventListener('focus', () => {
+      console.log('Canvas gained focus');
     });
   }
   
@@ -256,5 +270,19 @@ export class InputManager {
     this.frameKeyReleases.clear();
     this.mouse.buttons.clear();
     this.touches.clear();
+  }
+  
+  // Safely clear just the frame events (for state transitions)
+  clearFrameEvents() {
+    this.frameKeyPresses.clear();
+    this.frameKeyReleases.clear();
+  }
+  
+  // Ensure canvas has focus
+  ensureFocus() {
+    if (document.activeElement !== this.canvas) {
+      console.log('Refocusing canvas');
+      this.canvas.focus();
+    }
   }
 }

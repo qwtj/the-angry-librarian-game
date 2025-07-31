@@ -7,6 +7,8 @@ import { Kid } from '../entities/Kid.js';
 export class PlayingState extends State {
   constructor(game) {
     super(game);
+    this.instanceId = Math.random().toString(36).substring(7); // Unique ID for debugging
+    console.log(`[RESTART DEBUG] Creating new PlayingState instance: ${this.instanceId}`);
     this.player = null;
     this.kids = [];
     this.books = [];
@@ -57,6 +59,15 @@ export class PlayingState extends State {
   }
   
   enter() {
+    console.log(`[RESTART DEBUG] PlayingState.enter() called for instance: ${this.instanceId}`);
+    console.log(`[RESTART DEBUG] kids.length before clearing: ${this.kids.length}`);
+    
+    // Clear any existing entities first to prevent accumulation
+    this.kids = [];
+    this.books = [];
+    this.particles = [];
+    this.shelves = [];
+    
     // Reset game data
     this.game.gameData = {
       chaosLevel: 0,
@@ -71,6 +82,20 @@ export class PlayingState extends State {
       booksCollected: 0,
       booksShelved: 0,
       kidsRepelled: 0
+    };
+    
+    // Ensure kid spawning is reset to initial values
+    this.maxKids = 3;
+    this.lastMaxKids = 3;
+    this.kidSpawnTimer = 0;
+    this.kidSpawnInterval = 15;
+    
+    // Reset wave notification
+    this.maxKidsIncreaseNotification = {
+      active: false,
+      increase: 0,
+      timer: 0,
+      duration: 3
     };
     
     console.log(`[KID SPAWNING] World dimensions: ${this.worldWidth}x${this.worldHeight}`);
@@ -117,6 +142,21 @@ export class PlayingState extends State {
     this.kids = [];
     this.books = [];
     this.particles = [];
+    this.shelves = [];
+    
+    // Reset kid spawning variables to initial state
+    this.maxKids = 3;
+    this.lastMaxKids = 3;
+    this.kidSpawnTimer = 0;
+    this.kidSpawnInterval = 15;
+    
+    // Reset wave notification
+    this.maxKidsIncreaseNotification = {
+      active: false,
+      increase: 0,
+      timer: 0,
+      duration: 3
+    };
     
     // Pause music when leaving game
     if (this.bgMusic) {
@@ -154,11 +194,14 @@ export class PlayingState extends State {
     
     // Spawn initial kids
     const initialKids = 2; // Start with 2 kids
+    console.log(`[RESTART DEBUG] Before spawning: kids.length = ${this.kids.length}`);
     for (let i = 0; i < initialKids; i++) {
       const spawnPoint = this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)];
       const kid = new Kid(this.game, spawnPoint.x, spawnPoint.y, 1); // Easy kid
       this.kids.push(kid);
     }
+    console.log(`[RESTART DEBUG] After spawning: kids.length = ${this.kids.length}`);
+    console.log(`[RESTART DEBUG] maxKids = ${this.maxKids}`);
     
     // Initialize kid spawning for additional kids
     this.kidSpawnTimer = 15; // First additional kid spawns after 15 seconds
@@ -167,6 +210,12 @@ export class PlayingState extends State {
   update(deltaTime) {
     const input = this.game.inputManager;
     const gameData = this.game.gameData;
+    
+    // Recovery mechanism: Press 'r' to refocus canvas if input seems stuck
+    if (input.isKeyPressed('r') || input.isKeyPressed('R')) {
+      console.log('Manual focus recovery triggered');
+      input.ensureFocus();
+    }
     
     // Handle pause
     if (input.isKeyPressed('p') || input.isKeyPressed('Escape')) {
@@ -666,13 +715,29 @@ export class PlayingState extends State {
     const rows = 4;
     const cols = 8;
     
+    // Create color distribution array to ensure equal distribution
+    // 32 shelves / 6 colors = 5.33, so we need 5 of each color + 2 extra
+    const colorDistribution = [];
+    for (let i = 0; i < 5; i++) {
+      colorDistribution.push(...colors);
+    }
+    // Add 2 more to reach 32 total (we'll use red and blue for balance)
+    colorDistribution.push('red', 'blue');
+    
+    // Shuffle the color distribution for variety
+    for (let i = colorDistribution.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [colorDistribution[i], colorDistribution[j]] = [colorDistribution[j], colorDistribution[i]];
+    }
+    
+    let shelfIndex = 0;
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const x = startX + col * shelfSpacingX;
         const y = startY + row * shelfSpacingY;
         
-        // Pick a color for this shelf
-        const color = colors[(row * cols + col) % colors.length];
+        // Pick a color from our balanced distribution
+        const color = colorDistribution[shelfIndex];
         
         // Create shelf
         const shelf = new Shelf(this.game, x, y, color);
@@ -684,8 +749,18 @@ export class PlayingState extends State {
           shelf.addBook(book);
           this.books.push(book);
         }
+        
+        shelfIndex++;
       }
     }
+    
+    // Log color distribution for debugging
+    const colorCounts = {};
+    this.shelves.forEach(shelf => {
+      colorCounts[shelf.color] = (colorCounts[shelf.color] || 0) + 1;
+    });
+    console.log('[LIBRARY LAYOUT] Shelf color distribution:', colorCounts);
+    console.log('[LIBRARY LAYOUT] Total books per color:', Object.entries(colorCounts).map(([color, count]) => `${color}: ${count * 6}`));
   }
   
   isPlayerNearShelf(shelf, distance) {
