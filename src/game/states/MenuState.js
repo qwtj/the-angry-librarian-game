@@ -299,6 +299,7 @@ export class MenuState extends State {
       '• Kids will steal books - chase them away!',
       '• Keep Chaos below 100% or you lose',
       '• Level up to choose upgrades',
+      '• Shoot obnoxious kids to bring order to chaos',
       '',
       'Press Enter or Escape to return'
     ];
