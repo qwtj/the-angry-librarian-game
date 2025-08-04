@@ -124,13 +124,18 @@ export class StateManager {
     // Pop previous state from stack
     this.currentState = this.stateStack.pop();
     
-    // Re-enter the state we're returning to (important for maintaining focus)
+    // Re-enter the state we're returning to
     if (this.currentState && this.currentState.enter) {
       // For PlayingState, we don't want to reset the game, just unpause
       if (this.currentState.name === 'playing') {
         this.game.gameData.isPaused = false;
         // Ensure canvas has focus when returning to gameplay
         this.game.inputManager.ensureFocus();
+        
+        // Don't call enter() for PlayingState when popping - just unpause
+        // The enter() method would reset the entire game state
+      } else {
+        this.currentState.enter();
       }
     }
     

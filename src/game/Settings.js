@@ -1,7 +1,7 @@
 export default class Settings {
     constructor() {
         /* Game Settings */
-        this.GAME_PLAY = {
+        this.GAMEPLAY_SETTINGS = {
             chaosLevel: 0,
             maxChaos: 100,
             playerLevel: 1,
@@ -11,21 +11,24 @@ export default class Settings {
 
         /* Input Settings */
         this.KEY_BINDINGS = {
-            MOVE_UP: 'ArrowUp',
-            MOVE_DOWN: 'ArrowDown',
-            MOVE_LEFT: 'ArrowLeft',
-            MOVE_RIGHT: 'ArrowRight',
-            FIRE: 'Space',
-            PAUSE: 'Escape',
-            MUTE: 'KeyM',
-            DEBUG_TOGGLE: 'KeyD'
+            moveUp: ['w', 'W', 'ArrowUp'],
+            moveDown: ['s', 'S', 'ArrowDown'],
+            moveLeft: ['a', 'A', 'ArrowLeft'],
+            moveRight: ['d', 'D', 'ArrowRight'],
+            fire: [' ', 'Space'],
+            pause: ['p', 'P', 'Escape'],
+            mute: ['m', 'M'],
+            debugToggle: ['f', 'F']
         };
 
         /* Rendering Settings */
         this.RENDER_SETTINGS = {
-            showFPS: false, // Disabled FPS counter
+            showFPS: false,
             showCollisionBoxes: false,
-            showGrid: false
+            showGrid: false,
+            showDebugInfo: false,
+            enableParticles: true,
+            cameraSmoothness: 0.1
         };
 
         /* Asset Settings */
@@ -35,9 +38,41 @@ export default class Settings {
             KID_SPRITE: 'assets/sprites/kid.png',
             BACKGROUND_MUSIC: 'assets/audio/background.mp3'
         };
+    }
 
-        /* Other Settings */
-        this.MAX_WEAPONS = 3; // Maximum number of weapons the player can carry
+    // Make settings static for easier access
+    static get GAMEPLAY_SETTINGS() {
+        return {
+            chaosLevel: 0,
+            maxChaos: 100,
+            playerLevel: 1,
+            xpToNext: 100,
+            targetTime: 30 * 60,
+        };
+    }
+
+    static get KEY_BINDINGS() {
+        return {
+            moveUp: ['w', 'W', 'ArrowUp'],
+            moveDown: ['s', 'S', 'ArrowDown'],
+            moveLeft: ['a', 'A', 'ArrowLeft'],
+            moveRight: ['d', 'D', 'ArrowRight'],
+            fire: [' ', 'Space'],
+            pause: ['p', 'P', 'Escape'],
+            mute: ['m', 'M'],
+            debugToggle: ['f', 'F']
+        };
+    }
+
+    static get RENDER_SETTINGS() {
+        return {
+            showFPS: false,
+            showCollisionBoxes: false,
+            showGrid: false,
+            showDebugInfo: false,
+            enableParticles: true,
+            cameraSmoothness: 0.1
+        };
     }
 
     setSetting(key, value) {

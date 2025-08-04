@@ -34,15 +34,16 @@ export class Game {
     this.assetLoader = new AssetLoader();
     this.camera = new Camera(this.width, this.height);
     this.renderer = new Renderer(this.ctx, this.camera);
-    
+    this.settings = new Settings();
+
     // Debug info
     this.debug = {
-      ...Settings.RENDER_SETTINGS
+      ...this.settings.RENDER_SETTINGS
     };
     
     // Game-specific data
     this.gameData = {
-      ...Settings.GAME_PLAY,
+      ...this.settings.GAMEPLAY_SETTINGS,
       // Derived stats
       elapsedTime: 0,
       xp: 0,

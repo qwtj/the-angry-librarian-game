@@ -69,28 +69,18 @@ export class PlayingState extends State {
     console.log(`[RESTART DEBUG] PlayingState.enter() called for instance: ${this.instanceId}`);
     console.log(`[RESTART DEBUG] kids.length before clearing: ${this.kids.length}`);
     
+     // Ensure we have fresh gameData - don't modify existing, just ensure it's properly initialized
+    if (!this.game.gameData) {
+      console.error('No gameData found in game instance!');
+      return;
+    }
+
     // Clear any existing entities first to prevent accumulation
     this.kids = [];
     this.books = [];
     this.particles = [];
     this.shelves = [];
     
-    // Reset game data
-    this.game.gameData = {
-      chaosLevel: 0,
-      maxChaos: 100,
-      playerLevel: 1,
-      xp: 0,
-      xpToNext: 100,
-      elapsedTime: 0,
-      targetTime: 30 * 60,
-      isPaused: false,
-      // Stats tracking
-      booksCollected: 0,
-      booksShelved: 0,
-      kidsRepelled: 0,
-    };
-
     // Ensure kid spawning is reset to initial values
     this.maxKids = 3;
     this.lastMaxKids = 3;
@@ -187,6 +177,10 @@ export class PlayingState extends State {
   }
   
   initializeLevel() {
+    const gameData = this.game.gameData;
+    console.log(`[INITIALIZE LEVEL] Starting with gameData:`, gameData);
+    console.log(`[INITIALIZE LEVEL] Player level from gameData: ${gameData.playerLevel}`);
+    
     // Generate library layout first
     this.generateLibraryLayout();
     
@@ -199,7 +193,10 @@ export class PlayingState extends State {
       300  // Middle height of library
     );
     
-        // Give player a basic weapon
+    // Log player level from gameData - this is where the level should be read from
+    console.log(`[INITIALIZE LEVEL] Game will use player level: ${gameData.playerLevel}`);
+    
+    // Give player a basic weapon
     const basicWeapon = new Weapon('Basic Shot', 10, 0.3, 200);
     this.player.addWeapon(basicWeapon);
 
@@ -676,6 +673,87 @@ export class PlayingState extends State {
     // Render minimap only if enabled
     if (this.showMinimap) {
       this.renderMinimap(ctx);
+    }
+    
+    // Render debug info if enabled
+    if (this.game.debug.showDebugInfo) {
+      this.renderDebugInfo(ctx);
+    }
+    
+    ctx.restore();
+  }
+  
+  renderDebugInfo(ctx) {
+    const { width, height } = this.game;
+    const gameData = this.game.gameData;
+    
+    ctx.save();
+    
+    // Debug info panel (bottom left corner)
+    const panelWidth = 300;
+    const panelHeight = 200;
+    const panelX = 10;
+    const panelY = height - panelHeight - 10;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+    
+    // Border
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+    
+    // Debug info text
+    ctx.fillStyle = '#fff';
+    ctx.font = '14px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    
+    let y = panelY + 10;
+    const lineHeight = 16;
+    
+    // Title
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('DEBUG INFO', panelX + 10, y);
+    y += 24;
+    
+    ctx.font = '12px Arial';
+    
+    // Game state info
+    ctx.fillText(`FPS: ${this.game.gameLoop.getFPS()}`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Player Level: ${gameData.playerLevel}`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Elapsed Time: ${Math.floor(gameData.elapsedTime)}s`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Target Time: ${gameData.targetTime}s`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Books on Ground: ${this.books.filter(b => !b.isHeld && !b.isShelved).length}`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Kids Active: ${this.kids.length}`, panelX + 10, y);
+    y += lineHeight;
+    
+    ctx.fillText(`Max Kids: ${this.maxKids}`, panelX + 10, y);
+    y += lineHeight;
+    
+    if (this.player) {
+      ctx.fillText(`Player Pos: (${Math.floor(this.player.x)}, ${Math.floor(this.player.y)})`, panelX + 10, y);
+      y += lineHeight;
+      
+      ctx.fillText(`Player Speed: ${Math.floor(this.player.velocity.x + this.player.velocity.y)}`, panelX + 10, y);
+      y += lineHeight;
+    }
+    
+    // Camera info
+    if (this.game.camera) {
+      ctx.fillText(`Camera: (${Math.floor(this.game.camera.x)}, ${Math.floor(this.game.camera.y)})`, panelX + 10, y);
+      y += lineHeight;
     }
     
     ctx.restore();
