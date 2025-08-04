@@ -291,6 +291,7 @@ export class MenuState extends State {
       'WASD/Arrow Keys - Move',
       'Shift - Sprint (uses stamina)',
       'P/Escape - Pause',
+      'Space - Fire Gun 🔫',
       '',
       'GAMEPLAY:',
       '• Pick up books automatically when near them',
