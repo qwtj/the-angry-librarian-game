@@ -3,6 +3,7 @@ import { Player } from '../entities/Player.js';
 import { Book } from '../entities/Book.js';
 import { Shelf } from '../entities/Shelf.js';
 import { Kid } from '../entities/Kid.js';
+import { Weapon } from '../entities/Weapon.js';
 
 export class PlayingState extends State {
   constructor(game) {
@@ -14,7 +15,9 @@ export class PlayingState extends State {
     this.books = [];
     this.shelves = [];
     this.particles = [];
-    
+
+    this.projectiles = [];
+
     // World bounds - minimal area just for bookshelves
     // Shelves: 8 cols, last shelf at x = 320 + 7*160 = 1440, shelf width = 64
     // So rightmost edge = 1440 + 64 = 1504
@@ -81,9 +84,9 @@ export class PlayingState extends State {
       // Stats tracking
       booksCollected: 0,
       booksShelved: 0,
-      kidsRepelled: 0
+      kidsRepelled: 0,
     };
-    
+
     // Ensure kid spawning is reset to initial values
     this.maxKids = 3;
     this.lastMaxKids = 3;
@@ -143,7 +146,8 @@ export class PlayingState extends State {
     this.books = [];
     this.particles = [];
     this.shelves = [];
-    
+    this.weapons = [];
+
     // Reset kid spawning variables to initial state
     this.maxKids = 3;
     this.lastMaxKids = 3;
@@ -186,6 +190,10 @@ export class PlayingState extends State {
       300  // Middle height of library
     );
     
+        // Give player a basic weapon
+    const basicWeapon = new Weapon('Basic Shot', 10, 0.3, 200);
+    this.player.addWeapon(basicWeapon);
+
     // Set camera bounds to world
     this.game.camera.setBounds(0, 0, this.worldWidth, this.worldHeight);
     
@@ -265,8 +273,15 @@ export class PlayingState extends State {
     
     // Update kids
     const kidsBeforeUpdate = this.kids.length;
-    for (const kid of this.kids) {
+    for (let i = this.kids.length - 1; i >= 0; i--) {
+      const kid = this.kids[i];
       kid.update(deltaTime);
+      
+      // Remove hit kids when their timer expires
+      if (kid.isHit && kid.hitTimer <= 0) {
+        this.kids.splice(i, 1);
+        console.log(`[KID REMOVAL] Removed hit kid. Remaining: ${this.kids.length}`);
+      }
     }
     
     // Check if any kids disappeared during update
@@ -289,11 +304,72 @@ export class PlayingState extends State {
     // Update particles
     this.updateParticles(deltaTime);
     
+    // Update projectiles
+    this.updateProjectiles(deltaTime);
+
     // Validate book states (debug)
     if (Math.random() < 0.01) { // Check 1% of frames to avoid spam
       this.validateBookStates();
     }
     
+  }
+  
+  updateProjectiles(deltaTime) {
+    // Update projectiles and remove expired ones
+    this.projectiles = this.projectiles.filter(projectile => {
+      projectile.update(deltaTime);
+      
+      // Remove if off-screen or expired
+      if (projectile.x < 0 || projectile.x > this.worldWidth ||
+          projectile.y < 0 || projectile.y > this.worldHeight ||
+          projectile.lifetime <= 0) {
+        return false;
+      }
+
+      // Check collision with kids
+      for (let i = this.kids.length - 1; i >= 0; i--) {
+        const kid = this.kids[i];
+        if (!kid.isHit && this.checkProjectileCollision(projectile, kid)) {
+          // Handle hit
+          this.handleProjectileHit(projectile, kid);
+          return false; // Remove projectile after hit
+        }
+      }
+
+      return true; // Keep projectile
+    });
+  }
+
+  checkProjectileCollision(projectile, target) {
+    return projectile.x < target.x + target.width &&
+           projectile.x + projectile.width > target.x &&
+           projectile.y < target.y + target.height &&
+           projectile.y + projectile.height > target.y;
+  }
+
+  handleProjectileHit(projectile, kid) {
+    // Apply weapon effect to kid
+    if (projectile.weapon && projectile.weapon.onHit) {
+      projectile.weapon.onHit(kid);
+    }
+    
+    // Check if kid was successfully hit (turned blue)
+    if (kid.isHit) {
+      // Award XP for hitting kid
+      this.awardXP(15);
+      
+      // Track kids repelled
+      this.game.gameData.kidsRepelled++;
+    }
+    
+    // Create hit particle effect
+    this.particles.push({
+      type: 'hit',
+      x: projectile.x,
+      y: projectile.y,
+      lifetime: 0.5,
+      age: 0
+    });
   }
   
   updateChaos(deltaTime) {
@@ -397,6 +473,14 @@ export class PlayingState extends State {
     // Render all layers
     renderer.render(interpolation);
     
+    // Render projectiles
+    for (const projectile of this.projectiles) {
+      if (this.isInViewport(projectile, viewportX - padding, viewportY - padding, 
+                           viewportWidth + padding * 2, viewportHeight + padding * 2)) {
+        renderer.addToLayer('entities', projectile);
+      }
+    }
+
     // Render UI
     this.renderUI(ctx);
     

@@ -30,7 +30,8 @@ export class InputManager {
       ['moveRight', ['d', 'D', 'ArrowRight']],
       ['sprint', ['Shift']],
       ['pause', ['p', 'P', 'Escape']],
-      ['interact', [' ', 'e', 'E']]
+      ['interact', [' ', 'e', 'E']],
+      ['fire', ['Space', ' ', 'f', 'F']] // Space bar or F key to fire
     ]);
     
     // Make canvas focusable

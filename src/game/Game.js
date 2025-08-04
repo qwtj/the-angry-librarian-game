@@ -53,7 +53,8 @@ export class Game {
       // Stats tracking
       booksCollected: 0,
       booksShelved: 0,
-      kidsRepelled: 0
+      kidsRepelled: 0,
+      weapons: []
     };
   }
   

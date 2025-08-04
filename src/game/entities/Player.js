@@ -35,6 +35,11 @@ export class Player extends Entity {
     this.animationFrame = 0;
     this.isMoving = false;
     
+    // Weapon system
+    this.weapons = [];
+    this.activeWeapon = null;
+    this.fireTimer = 0;
+
     // Collision box (covers most of the player)
     this.collisionBox = {
       offsetX: 8,
@@ -159,6 +164,17 @@ export class Player extends Entity {
       this.animationTimer = 0;
     }
     
+    // Update weapon fire timer
+    if (this.fireTimer > 0) {
+      this.fireTimer -= deltaTime;
+    }
+
+    
+    // Check for weapon firing input
+    if (input.isActionDown('fire') && this.canFire()) {
+      this.fireWeapon();
+    }
+
     // Update camera to follow player
     this.game.camera.follow(this);
   }
@@ -336,7 +352,64 @@ export class Player extends Entity {
       ctx.restore();
     }
   }
-  
+
+  // Weapon methods
+  addWeapon(weapon) {
+    this.weapons.push(weapon);
+    if (!this.activeWeapon) {
+      this.activeWeapon = weapon;
+    }
+  }
+
+  canFire() {
+    return this.activeWeapon && this.fireTimer <= 0;
+  }
+
+  fireWeapon() {
+    if (!this.canFire()) return;
+
+    // Get firing direction (could be based on movement or mouse position)
+    const direction = this.getFiringDirection();
+    
+    // Create projectile
+    const projectile = this.activeWeapon.fire(
+      this.getCenterX(),
+      this.getCenterY(),
+      direction.x,
+      direction.y
+    );
+
+    if (projectile) {
+      // Add projectile to game state
+      const state = this.game.stateManager.currentState;
+      if (state && state.projectiles) {
+        state.projectiles.push(projectile);
+      }
+
+      // Set fire cooldown
+      this.fireTimer = this.activeWeapon.fireRate;
+    }
+  }
+
+  getFiringDirection() {
+    const input = this.game.inputManager;
+    
+    // Option 1: Fire in movement direction
+    const movement = input.getMovementVector();
+    if (movement.x !== 0 || movement.y !== 0) {
+      return movement;
+    }
+
+    // Option 2: Fire in last facing direction
+    switch (this.facing) {
+      case 'up': return { x: 0, y: -1 };
+      case 'down': return { x: 0, y: 1 };
+      case 'left': return { x: -1, y: 0 };
+      case 'right': return { x: 1, y: 0 };
+      default: return { x: 0, y: -1 }; // Default up
+    }
+  }
+
   pickupBook(book) {
     if (this.carriedBooks.length >= this.stats.carrySlots) {
       return false;

@@ -42,9 +42,19 @@ export class Kid extends Entity {
     
     // Sound effects
     this.hasPlayedLaughSound = false; // Prevent multiple laugh sounds per flee
+
+    this.isHit = false;
+    this.health = 1; // Kids have 1 health
+    this.hitTimer = 10.0; // Time before hit kids are removed (2 seconds)
   }
   
   update(deltaTime) {
+    if (this.isHit) {
+      this.hitTimer -= deltaTime;
+      // Kid will be removed by PlayingState when hitTimer <= 0
+      return;
+    }
+
     // Update cooldowns
     if (this.bookStealCooldown > 0) {
       this.bookStealCooldown -= deltaTime;
@@ -348,7 +358,9 @@ export class Kid extends Entity {
     let sprite;
     const spritePrefix = `kid${this.spriteType}`;
     
-    if (this.isMoving) {
+    if (this.isHit) {
+      ctx.fillStyle = '#0066ff'; // Blue color for hit kids
+    } else if (this.isMoving) {
       // Use walking sprite when moving
       sprite = this.animationFrame === 0 
         ? this.game.assetLoader.getImage(`${spritePrefix}Stand`)
@@ -707,6 +719,21 @@ export class Kid extends Entity {
       laughSound.volume = 0.5;
       laughSound.play().catch(e => console.log('Kid laugh sound play failed:', e));
       this.hasPlayedLaughSound = true;
+    }
+  }
+
+  takeDamage(damage) {
+    if (this.isHit) return; // Already hit
+    
+    this.health -= damage;
+    if (this.health <= 0) {
+      this.isHit = true;
+      // Change to blue color when hit
+      this.color = '#0066ff';
+      // Stop movement
+      this.state = 'hit';
+      this.vx = 0;
+      this.vy = 0;
     }
   }
 }
