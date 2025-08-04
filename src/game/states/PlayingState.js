@@ -47,6 +47,7 @@ export class PlayingState extends State {
 
     // UI toggle state
     this.showMinimap = true; // Add this line
+    this.musicMuted = false; // Add this line
 
     // Background music
     this.bgMusic = null;
@@ -118,15 +119,20 @@ export class PlayingState extends State {
       
       this.bgMusic.addEventListener('loadeddata', () => {
         this.musicLoaded = true;
-        this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+        // Only play if not muted
+        if (!this.musicMuted) {
+          this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+        }
       });
       
       this.bgMusic.load();
     } else {
-      // Resume if returning to game
-      this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+      // Resume if returning to game and not muted
+      if (!this.musicMuted) {
+        this.bgMusic.play().catch(e => console.log('Game music play failed:', e));
+      }
     }
-    
+
     // Initialize sound effects
     if (this.pickupSounds.length === 0) {
       // Create 5 audio instances for overlapping pickup sounds
@@ -231,6 +237,18 @@ export class PlayingState extends State {
     // Toggle minimap with 'h' key
     if (input.isKeyPressed('h') || input.isKeyPressed('H')) {
       this.showMinimap = !this.showMinimap;
+    }
+
+    // Toggle music mute with 'm' key
+    if (input.isKeyPressed('m') || input.isKeyPressed('M')) {
+      this.musicMuted = !this.musicMuted;
+      if (this.bgMusic) {
+        if (this.musicMuted) {
+          this.bgMusic.pause();
+        } else {
+          this.bgMusic.play().catch(e => console.log('Music unmute play failed:', e));
+        }
+      }
     }
 
     // Handle pause

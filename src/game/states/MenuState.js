@@ -240,7 +240,7 @@ export class MenuState extends State {
     
     // Draw light brown background box with rounded corners
     const boxWidth = 700;
-    const boxHeight = 580; // Increased height to fit all text
+    const boxHeight = 640; // Increased height to fit all text
     const boxX = (width - boxWidth) / 2;
     const boxY = height * 0.08;
     const borderRadius = 20;
@@ -292,6 +292,7 @@ export class MenuState extends State {
       'Shift - Sprint (uses stamina)',
       'P/Escape - Pause',
       'h - Hide/Show Minimap',
+      'm - Mute/Unmute Music',
       'Space - Fire Gun 🔫',
       '',
       'GAMEPLAY:',
