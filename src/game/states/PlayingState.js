@@ -44,7 +44,10 @@ export class PlayingState extends State {
     // Performance optimizations
     this.floorPattern = null; // Cache floor pattern
     this.patternCanvas = null; // Canvas for pattern
-    
+
+    // UI toggle state
+    this.showMinimap = true; // Add this line
+
     // Background music
     this.bgMusic = null;
     this.musicLoaded = false;
@@ -225,6 +228,11 @@ export class PlayingState extends State {
       input.ensureFocus();
     }
     
+    // Toggle minimap with 'h' key
+    if (input.isKeyPressed('h') || input.isKeyPressed('H')) {
+      this.showMinimap = !this.showMinimap;
+    }
+
     // Handle pause
     if (input.isKeyPressed('p') || input.isKeyPressed('Escape')) {
       // Pause music when pausing game
@@ -647,9 +655,76 @@ export class PlayingState extends State {
       }
     }
     
+    // Render minimap only if enabled
+    if (this.showMinimap) {
+      this.renderMinimap(ctx);
+    }
+    
     ctx.restore();
   }
   
+  renderMinimap(ctx) {
+    const { width, height } = this.game;
+    const minimapSize = 150;
+    const minimapX = width - minimapSize - 20;
+    const minimapY = height - minimapSize - 20;
+    
+    // Minimap background
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(minimapX, minimapY, minimapSize, minimapSize);
+    
+    // Border
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(minimapX, minimapY, minimapSize, minimapSize);
+    
+    // World scale
+    const scaleX = minimapSize / this.worldWidth;
+    const scaleY = minimapSize / this.worldHeight;
+    
+    // Draw shelves as small rectangles
+    ctx.fillStyle = '#8B4513';
+    for (const shelf of this.shelves) {
+      const x = minimapX + shelf.x * scaleX;
+      const y = minimapY + shelf.y * scaleY;
+      const w = shelf.width * scaleX;
+      const h = shelf.height * scaleY;
+      ctx.fillRect(x, y, Math.max(2, w), Math.max(2, h));
+    }
+    
+    // Draw player as green dot
+    if (this.player) {
+      ctx.fillStyle = '#00ff00';
+      const playerX = minimapX + this.player.getCenterX() * scaleX;
+      const playerY = minimapY + this.player.getCenterY() * scaleY;
+      ctx.beginPath();
+      ctx.arc(playerX, playerY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    // Draw kids as red dots
+    ctx.fillStyle = '#ff0000';
+    for (const kid of this.kids) {
+      const kidX = minimapX + kid.getCenterX() * scaleX;
+      const kidY = minimapY + kid.getCenterY() * scaleY;
+      ctx.beginPath();
+      ctx.arc(kidX, kidY, 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Show carrying status
+      if (kid.carriedBook) {
+        ctx.strokeStyle = '#ffff00';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(kidX, kidY, 4, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+    
+    ctx.restore();
+  }
+
   renderChaosVignette(ctx, intensity) {
     const { width, height } = this.game;
     
