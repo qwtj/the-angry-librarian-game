@@ -8,6 +8,7 @@ export class GameOverState extends State {
     this.stats = {};
     this.menuItems = [
       { text: 'Play Again', action: () => this.playAgain() },
+      { text: 'Share to X.com', action: () => this.shareToX() },
       { text: 'Main Menu', action: () => this.mainMenu() }
     ];
     this.selectedIndex = 0;
@@ -282,6 +283,41 @@ export class GameOverState extends State {
   
   mainMenu() {
     this.game.stateManager.changeState('menu');
+  }
+  
+  shareToX() {
+    const minutes = Math.floor(this.stats.timeElapsed / 60);
+    const seconds = this.stats.timeElapsed % 60;
+    const timeString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    
+    let shareText;
+    if (this.won) {
+      shareText = `🏆 I just survived 30 minutes of library chaos in The Librarian Game! 📚\n\n` +
+                  `📊 Final Stats:\n` +
+                  `⏱️ Time: ${timeString}\n` +
+                  `📈 Level: ${this.stats.level}\n` +
+                  `🌪️ Peak Chaos: ${this.stats.chaosLevel}%\n` +
+                  `📚 Books Collected: ${this.stats.booksCollected}\n` +
+                  `🏠 Books Shelved: ${this.stats.booksShelved}\n` +
+                  `👦 Kids Repelled: ${this.stats.kidsRepelled}\n\n` +
+                  'Thanks to @mreflow https://x.com/mreflow\n\n' + 
+                  'https://github.com/mreflow/the-librarian-game\n\n' +
+                  `Can you beat my score? #LibrarianGame #GameOver #Victory`;
+    } else {
+      shareText = `📚 I just played The Librarian Game and lasted ${timeString} before the chaos took over! 😅\n\n` +
+                  `📊 My Stats:\n` +
+                  `📈 Level Reached: ${this.stats.level}\n` +
+                  `🌪️ Peak Chaos: ${this.stats.chaosLevel}%\n` +
+                  `📚 Books Collected: ${this.stats.booksCollected}\n` +
+                  `🏠 Books Shelved: ${this.stats.booksShelved}\n` +
+                  `👦 Kids Repelled: ${this.stats.kidsRepelled}\n\n` +
+                  'Thanks to @mreflow https://x.com/mreflow\n\n' + 
+                  'https://github.com/mreflow/the-librarian-game\n\n' +
+                  `Think you can do better? #LibrarianGame #GameOver #Challenge`;
+    }
+    
+    const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(tweetUrl, '_blank');
   }
   
   playSelectSound() {
