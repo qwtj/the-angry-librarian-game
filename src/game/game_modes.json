@@ -1,0 +1,23 @@
+{
+  "classic": {
+    "description": "The original game mode with no modifications.",
+    "settings": {
+      "difficulty": "normal",
+      "timeLimit": 30
+    }
+  },
+  "chaos": {
+    "description": "A more chaotic version of the game with random events.",
+    "settings": {
+      "difficulty": "hard",
+      "timeLimit": 20
+    }
+  },
+  "relaxed": {
+    "description": "A more relaxed version of the game with extended time limits.",
+    "settings": {
+      "difficulty": "easy",
+      "timeLimit": 40
+    }
+  }
+}

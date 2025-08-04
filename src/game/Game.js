@@ -4,6 +4,7 @@ import { InputManager } from './systems/InputManager.js';
 import { AssetLoader } from './systems/AssetLoader.js';
 import { Camera } from './systems/Camera.js';
 import { Renderer } from './systems/Renderer.js';
+import Settings from './Settings.js';
 
 export class Game {
   constructor(canvasId) {
@@ -17,8 +18,9 @@ export class Game {
     this.ctx = this.canvas.getContext('2d');
     
     // Set canvas size
-    this.width = 1280;
-    this.height = 720;
+    this.width =  window.innerWidth;
+    this.height = window.innerHeight;
+
     this.setupCanvas();
     
     // Core systems
@@ -35,26 +37,20 @@ export class Game {
     
     // Debug info
     this.debug = {
-      showFPS: false, // Disabled FPS counter
-      showCollisionBoxes: false,
-      showGrid: false
+      ...Settings.RENDER_SETTINGS
     };
     
     // Game-specific data
     this.gameData = {
-      chaosLevel: 0,
-      maxChaos: 100,
-      playerLevel: 1,
-      xp: 0,
-      xpToNext: 100,
+      ...Settings.GAME_PLAY,
+      // Derived stats
       elapsedTime: 0,
-      targetTime: 30 * 60, // 30 minutes in seconds
+      xp: 0,
       isPaused: false,
       // Stats tracking
       booksCollected: 0,
       booksShelved: 0,
       kidsRepelled: 0,
-      weapons: []
     };
   }
   
@@ -63,22 +59,32 @@ export class Game {
     this.canvas.height = this.height;
     
     // Handle window resize
+    window.addEventListener('resize', () => {
+      this.handleResize();
+    });
+    
+    // Initial setup
     this.handleResize();
-    window.addEventListener('resize', () => this.handleResize());
   }
   
   handleResize() {
-    const container = this.canvas.parentElement;
-    const containerWidth = container.clientWidth;
-    const containerHeight = container.clientHeight;
+    // Update game dimensions
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
     
-    const scale = Math.min(
-      containerWidth / this.width,
-      containerHeight / this.height
-    );
+    // Set canvas size to match window
+    this.canvas.width = this.width;
+    this.canvas.height = this.height;
     
-    this.canvas.style.width = `${this.width * scale}px`;
-    this.canvas.style.height = `${this.height * scale}px`;
+    // Update camera viewport
+    if (this.camera) {
+      this.camera.viewportWidth = this.width;
+      this.camera.viewportHeight = this.height;
+    }
+    
+    // Canvas style should match actual size (no scaling needed)
+    this.canvas.style.width = `${this.width}px`;
+    this.canvas.style.height = `${this.height}px`;
   }
   
   async init() {
