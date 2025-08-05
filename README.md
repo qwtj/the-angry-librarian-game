@@ -7,7 +7,7 @@ A top-down 2D game where you play as a librarian trying to maintain order in a c
 *   **Movement:** WASD or Arrow Keys
 *   **Sprint:** Shift (drains stamina)
 *   **Pause:** P or Escape
-*   **Fire Gun:** Spacebar
+*   **Shoot Detention Slips:** Spacebar
 
 ## Game Mechanics
 

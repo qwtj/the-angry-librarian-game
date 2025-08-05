@@ -600,7 +600,7 @@
         'P/Escape - Pause',
         'h - Hide/Show Minimap',
         'm - Mute/Unmute Music',
-        'Space - Fire Gun 🔫',
+        'Space - Shoot Detention Slips',
         '',
         'GAMEPLAY:',
         '• Pick up books automatically when near them',
@@ -608,7 +608,7 @@
         '• Kids will steal books - chase them away!',
         '• Keep Chaos below 100% or you lose',
         '• Level up to choose upgrades',
-        '• Shoot obnoxious kids to bring order to chaos',
+        '• Shoot detention slips to bring order to chaos',
         '',
         'Press Enter or Escape to return'
       ];
